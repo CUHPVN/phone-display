@@ -792,6 +792,7 @@
 
   // --- Keyboard Support (PC physical keyboard + Mobile soft keyboard button) ---
   let isComposing = false;
+  let isMobileKeyboardOpen = false;
   const KBD_SENTINEL = " ";
 
   function resetMobileKbdInput() {
@@ -799,16 +800,30 @@
     try { mobileKbdInput.setSelectionRange(1, 1); } catch { /* ignore */ }
   }
 
+  function setMobileKeyboardUi(open) {
+    isMobileKeyboardOpen = open;
+    btnKeyboard.textContent = open ? "⌨ On" : "⌨ Off";
+    btnKeyboard.classList.toggle("active", open);
+  }
+
   function sendKeyTap(key, code) {
     sendControl({ type: "input", action: "keydown", key, code });
     sendControl({ type: "input", action: "keyup", key, code });
   }
 
+  // Capture state on pointerdown before blur fires on mobileKbdInput
+  let kbdWasOpenOnDown = false;
+  btnKeyboard.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    kbdWasOpenOnDown = isMobileKeyboardOpen;
+  });
+
   btnKeyboard.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (document.activeElement === mobileKbdInput) {
+    if (kbdWasOpenOnDown) {
       mobileKbdInput.blur();
-      btnKeyboard.classList.remove("active");
+      setMobileKeyboardUi(false);
+      showToast("Keyboard OFF", 1200);
       return;
     }
 
@@ -821,11 +836,12 @@
 
     resetMobileKbdInput();
     mobileKbdInput.focus({ preventScroll: true });
-    btnKeyboard.classList.add("active");
+    setMobileKeyboardUi(true);
+    showToast("Keyboard ON", 1200);
   });
 
   mobileKbdInput.addEventListener("blur", () => {
-    btnKeyboard.classList.remove("active");
+    setMobileKeyboardUi(false);
   });
 
   mobileKbdInput.addEventListener("compositionstart", () => {
