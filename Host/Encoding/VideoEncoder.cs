@@ -321,7 +321,8 @@ public sealed class VideoEncoder : IDisposable
                 string? line = stderr.ReadLine();
                 if (line is null) break;
                 if (!string.IsNullOrWhiteSpace(line) &&
-                    !line.Contains("No filtered frames for output stream", StringComparison.OrdinalIgnoreCase))
+                    !line.Contains("No filtered frames for output stream", StringComparison.OrdinalIgnoreCase) &&
+                    !line.Contains("not enough frames to estimate rate", StringComparison.OrdinalIgnoreCase))
                 {
                     LastError = $"[{encoderLabel}] {line}";
                 }
