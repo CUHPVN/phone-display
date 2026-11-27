@@ -65,9 +65,26 @@ public partial class MainWindow : Window
         InitializeComponent();
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
 
         _uiTimer.Tick += UiTimer_Tick;
         _uiTimer.Start();
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.System && e.SystemKey == System.Windows.Input.Key.Space)
+        {
+            e.Handled = true;
+            var screenPt = PointToScreen(new System.Windows.Point(12, 44));
+            SystemCommands.ShowSystemMenu(this, screenPt);
+        }
+        else if (e.Key == System.Windows.Input.Key.W &&
+                 (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control)
+        {
+            e.Handled = true;
+            Close();
+        }
     }
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -449,10 +466,7 @@ public partial class MainWindow : Window
 
         SetControlsEnabled(true);
         BtnToggleStream.Content = AppStrings.Get(_lang, "BtnStart");
-        BtnToggleStream.Background = new LinearGradientBrush(
-            MediaColor.FromRgb(14, 165, 233),
-            MediaColor.FromRgb(37, 99, 235),
-            0);
+        BtnToggleStream.Background = new SolidColorBrush(MediaColor.FromRgb(37, 99, 235));
         if (_trayToggleItem is not null) _trayToggleItem.Text = AppStrings.Get(_lang, "BtnStart");
         SetStatusBadge(AppStrings.Get(_lang, "StatusReady"), MediaColor.FromRgb(56, 189, 248));
         StatEncoder.Text = AppStrings.Get(_lang, "EncoderIdle");

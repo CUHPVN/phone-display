@@ -77,9 +77,9 @@
   let videoHeight = 1080;
   let drawRect = { x: 0, y: 0, w: 1920, h: 1080 };
 
-  const inputModes = ["trackpad", "touch", "view"];
+  const inputModes = ["view", "trackpad", "touch"];
   let inputModeIndex = 0;
-  let inputMode = "trackpad"; // "trackpad" | "touch" | "view"
+  let inputMode = "view"; // "view" | "trackpad" | "touch"
   const fpsPresets = [60, 90, 120];
   let fpsPresetIndex = 0;
   const bitratePresets = [8000, 12000, 20000, 30000];
