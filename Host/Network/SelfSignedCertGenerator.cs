@@ -95,6 +95,34 @@ public static class SelfSignedCertGenerator
         return null;
     }
 
+    public static IPAddress? GetRadminOrVpnIPv4Address()
+    {
+        foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (ni.OperationalStatus != OperationalStatus.Up)
+                continue;
+            if (ni.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
+                continue;
+
+            string nameDesc = $"{ni.Name} {ni.Description}".ToLowerInvariant();
+            bool isRemoteVpn = nameDesc.Contains("radmin") ||
+                               nameDesc.Contains("tailscale") ||
+                               nameDesc.Contains("zerotier") ||
+                               nameDesc.Contains("hamachi");
+            if (!isRemoteVpn) continue;
+
+            foreach (var unicast in ni.GetIPProperties().UnicastAddresses)
+            {
+                if (unicast.Address.AddressFamily == AddressFamily.InterNetwork &&
+                    !IPAddress.IsLoopback(unicast.Address))
+                {
+                    return unicast.Address;
+                }
+            }
+        }
+        return null;
+    }
+
     public static X509Certificate2 LoadOrCreateCertificate(IReadOnlyCollection<IPAddress> lanIps)
     {
         string dir = Path.Combine(

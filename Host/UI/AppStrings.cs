@@ -15,6 +15,12 @@ public static class AppStrings
 
         (AppLanguage.Vi, "HideTray") => "▾ Khay",
         (AppLanguage.En, "HideTray") => "▾ Tray",
+        (AppLanguage.Vi, "BtnFirewall") => "🛡 Firewall",
+        (AppLanguage.En, "BtnFirewall") => "🛡 Firewall",
+        (AppLanguage.Vi, "FirewallOk") => "Đã mở cổng Firewall 8080 & 8443 cho LAN / Radmin VPN!",
+        (AppLanguage.En, "FirewallOk") => "Opened Firewall ports 8080 & 8443 for LAN / Radmin VPN!",
+        (AppLanguage.Vi, "FirewallCancelled") => "Chưa cấp quyền Administrator để mở Firewall.",
+        (AppLanguage.En, "FirewallCancelled") => "Administrator permission was cancelled.",
 
         (AppLanguage.Vi, "HeroTitle") => "Màn hình phụ không dây & USB cho Windows 11",
         (AppLanguage.En, "HeroTitle") => "Wireless & USB Extended Monitor for Windows 11",

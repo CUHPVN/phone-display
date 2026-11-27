@@ -134,6 +134,7 @@ public partial class MainWindow : Window
         TxtLangCode.Text = _lang == AppLanguage.Vi ? "VI" : "EN";
         TxtTitleTag.Text = S("TitleTag");
         TxtHideToTray.Text = S("HideTray");
+        TxtFirewallBtn.Text = S("BtnFirewall");
         TxtHeroTitle.Text = S("HeroTitle");
         TxtHeroSub.Text = S("HeroSub");
         TxtSectionConfig.Text = S("SectionConfig");
@@ -218,6 +219,17 @@ public partial class MainWindow : Window
         TxtLanUrl.Text = lanUrl;
         TxtAccessPin.Text = $"PIN: {_accessPin}";
         ImgQrCode.Source = GenerateQrBitmap(lanUrl);
+
+        var vpnIp = SelfSignedCertGenerator.GetRadminOrVpnIPv4Address();
+        if (vpnIp is not null)
+        {
+            TxtVpnUrl.Text = $"https://{vpnIp}:{_httpsPort}/?token={_accessPin}";
+            PanelRadmin.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            PanelRadmin.Visibility = Visibility.Collapsed;
+        }
     }
 
     private static BitmapImage GenerateQrBitmap(string url)
@@ -645,6 +657,54 @@ public partial class MainWindow : Window
     {
         System.Windows.Clipboard.SetText(TxtLanUrl.Text);
         await FlashButtonTextAsync(BtnCopyLan, AppStrings.Get(_lang, "Copied"));
+    }
+
+    private async void BtnCopyVpn_Click(object sender, RoutedEventArgs e)
+    {
+        System.Windows.Clipboard.SetText(TxtVpnUrl.Text);
+        await FlashButtonTextAsync(BtnCopyVpn, AppStrings.Get(_lang, "Copied"));
+    }
+
+    private void BtnFirewall_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string cmdArgs =
+                "/c \"netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8080\\\" >nul 2>&1 & " +
+                "netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8443\\\" >nul 2>&1 & " +
+                "netsh advfirewall firewall add rule name=\\\"PhoneDisplay TCP 8080\\\" dir=in action=allow protocol=TCP localport=8080 profile=any & " +
+                "netsh advfirewall firewall add rule name=\\\"PhoneDisplay TCP 8443\\\" dir=in action=allow protocol=TCP localport=8443 profile=any\"";
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = cmdArgs,
+                Verb = "runas",
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit(10000);
+
+            if (proc is { ExitCode: 0 })
+            {
+                HideError();
+                System.Windows.MessageBox.Show(
+                    AppStrings.Get(_lang, "FirewallOk"),
+                    "PhoneDisplay Firewall",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            ShowError(AppStrings.Get(_lang, "FirewallCancelled"));
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
     }
 
     private static async Task FlashButtonTextAsync(System.Windows.Controls.Button btn, string tempText)
