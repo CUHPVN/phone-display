@@ -371,7 +371,16 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock x:Name="TxtSectionConnect" Text="KẾT NỐI TRÊN ANDROID" FontSize="11" FontWeight="Bold" Foreground="#34D399" Margin="0,0,0,10"/>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TxtSectionConnect" Text="KẾT NỐI TRÊN ANDROID" FontSize="11" FontWeight="Bold" Foreground="#34D399" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="#13221C" BorderBrush="#1F4032" BorderThickness="1" CornerRadius="6" Padding="8,3">
+                                    <TextBlock x:Name="TxtAccessPin" Text="PIN: ------" FontSize="11" FontWeight="Bold" FontFamily="Consolas" Foreground="#34D399"/>
+                                </Border>
+                            </Grid>
 
                             <!-- USB Box -->
                             <Border Grid.Row="1" Background="#0D111A" BorderBrush="#1E2636" BorderThickness="1"

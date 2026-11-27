@@ -171,8 +171,9 @@ public sealed unsafe class ScreenCapturer : IDisposable
 
         try
         {
+            int acquireTimeout = _hasLastFrame ? 0 : timeoutMs;
             var result = _duplication!.AcquireNextFrame(
-                timeoutMs,
+                acquireTimeout,
                 out OutduplFrameInfo frameInfo,
                 out IDXGIResource? desktopResource);
 

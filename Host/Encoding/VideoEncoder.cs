@@ -19,7 +19,7 @@ public sealed class VideoEncoder : IDisposable
     private Task? _stdoutTask;
     private Task? _stderrTask;
 
-    private readonly ConcurrentQueue<long> _submitTimestampsUs = new();
+    private long _lastSubmitTimestampUs;
     private int _isWritingFrame;
     private bool _disposed;
 
@@ -117,7 +117,7 @@ public sealed class VideoEncoder : IDisposable
         Fps = fps;
         BitrateKbps = bitrateKbps;
         _parser.Reset();
-        _submitTimestampsUs.Clear();
+        Interlocked.Exchange(ref _lastSubmitTimestampUs, 0);
         _framesSubmittedToCurrentProcess = 0;
         LastError = null;
 
@@ -190,9 +190,9 @@ public sealed class VideoEncoder : IDisposable
     {
         int bufSize = Math.Max(kbps / 4, 500);
         int gop = fps * 2;
-        return $"-hide_banner -loglevel warning -fflags nobuffer -flags low_delay " +
+        return $"-hide_banner -loglevel warning -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -flush_packets 1 -max_delay 0 " +
                $"-f rawvideo -pix_fmt bgra -s {w}x{h} -r {fps} -i pipe:0 " +
-               $"-c:v h264_nvenc -preset p1 -tune ull -zerolatency 1 -profile:v baseline " +
+               $"-sws_flags fast_bilinear -c:v h264_nvenc -preset p1 -tune ull -zerolatency 1 -delay 0 -profile:v baseline " +
                $"-pix_fmt yuv420p -rc cbr -b:v {kbps}k -maxrate {kbps}k -bufsize {bufSize}k " +
                $"-g {gop} -bf 0 -forced-idr 1 -f h264 pipe:1";
     }
@@ -201,9 +201,9 @@ public sealed class VideoEncoder : IDisposable
     {
         int bufSize = Math.Max(kbps / 4, 500);
         int gop = fps * 2;
-        return $"-hide_banner -loglevel warning -fflags nobuffer -flags low_delay " +
+        return $"-hide_banner -loglevel warning -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -flush_packets 1 -max_delay 0 " +
                $"-f rawvideo -pix_fmt bgra -s {w}x{h} -r {fps} -i pipe:0 " +
-               $"-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline " +
+               $"-sws_flags fast_bilinear -c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline " +
                $"-pix_fmt yuv420p -b:v {kbps}k -maxrate {kbps}k -bufsize {bufSize}k " +
                $"-x264-params \"keyint={gop}:min-keyint={fps}:scenecut=0:bframes=0:repeat-headers=1\" " +
                $"-f h264 pipe:1";
@@ -252,7 +252,7 @@ public sealed class VideoEncoder : IDisposable
                 if (_disposed || _stdin is null || _process is null || _process.HasExited)
                     return false;
 
-                _submitTimestampsUs.Enqueue(nowUs);
+                Interlocked.Exchange(ref _lastSubmitTimestampUs, nowUs);
                 _stdin.Write(bgraFrame);
                 _stdin.Flush();
                 Interlocked.Increment(ref _framesSubmittedToCurrentProcess);
@@ -292,7 +292,8 @@ public sealed class VideoEncoder : IDisposable
                 {
                     long nowUs = GetTimestampUs();
                     uint encodeUs = 0;
-                    if (_submitTimestampsUs.TryDequeue(out long submitUs))
+                    long submitUs = Interlocked.Read(ref _lastSubmitTimestampUs);
+                    if (submitUs > 0)
                     {
                         long diff = Math.Max(0, nowUs - submitUs);
                         encodeUs = (uint)Math.Min(diff, uint.MaxValue);

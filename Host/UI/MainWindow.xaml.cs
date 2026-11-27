@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Windows;
 using System.Windows.Controls;
@@ -55,6 +56,9 @@ public partial class MainWindow : Window
     private double _measuredFps;
     private string _lastIpSignature = string.Empty;
     private int _networkCheckTicks;
+    private string _accessPin = GeneratePin();
+
+    private static string GeneratePin() => RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
     public MainWindow()
     {
@@ -204,14 +208,15 @@ public partial class MainWindow : Window
         _lanCert = SelfSignedCertGenerator.LoadOrCreateCertificate(lanIps);
 
         string lanUrl = lanIps.Count > 0
-            ? $"https://{lanIps[0]}:{_httpsPort}"
-            : $"https://127.0.0.1:{_httpsPort}";
+            ? $"https://{lanIps[0]}:{_httpsPort}/?token={_accessPin}"
+            : $"https://127.0.0.1:{_httpsPort}/?token={_accessPin}";
 
         var usbIp = SelfSignedCertGenerator.GetUsbTetheringIPv4Address();
         TxtUsbUrl.Text = usbIp is not null
-            ? $"https://{usbIp}:{_httpsPort}"
-            : $"http://localhost:{_httpPort}";
+            ? $"https://{usbIp}:{_httpsPort}/?token={_accessPin}"
+            : $"http://localhost:{_httpPort}/?token={_accessPin}";
         TxtLanUrl.Text = lanUrl;
+        TxtAccessPin.Text = $"PIN: {_accessPin}";
         ImgQrCode.Source = GenerateQrBitmap(lanUrl);
     }
 
@@ -317,7 +322,7 @@ public partial class MainWindow : Window
                 _currentBitrateKbps);
 
             _lanCert ??= SelfSignedCertGenerator.LoadOrCreateCertificate(SelfSignedCertGenerator.GetLocalIPv4Addresses());
-            _server = new StreamingServer(config, clientPath, _lanCert, _inputInjector);
+            _server = new StreamingServer(config, clientPath, _lanCert, _inputInjector, _accessPin);
 
             _encoder.OnEncodedFrame += (nalUnit, isKeyframe, tsUs, encUs) =>
             {
@@ -509,11 +514,11 @@ public partial class MainWindow : Window
         if (usbIp is not null)
         {
             TxtUsbStatus.Text = AppStrings.Get(_lang, "UsbTetheringReady");
-            TxtUsbUrl.Text = $"https://{usbIp}:{_httpsPort}";
+            TxtUsbUrl.Text = $"https://{usbIp}:{_httpsPort}/?token={_accessPin}";
         }
         else
         {
-            TxtUsbUrl.Text = $"http://localhost:{_httpPort}";
+            TxtUsbUrl.Text = $"http://localhost:{_httpPort}/?token={_accessPin}";
             if (_adbHelper is not null)
                 TxtUsbStatus.Text = _adbHelper.StatusSummary;
         }

@@ -21,6 +21,7 @@ public sealed class StreamingServer : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly ConcurrentDictionary<Guid, ClientSession> _clients = new();
     private readonly InputInjector _inputInjector;
+    private readonly string _accessToken;
     private volatile bool _isStopping;
 
     public int ConnectedClientCount => _clients.Count;
@@ -33,9 +34,11 @@ public sealed class StreamingServer : IAsyncDisposable
         AppConfig config,
         string clientRootPath,
         X509Certificate2 lanCert,
-        InputInjector inputInjector)
+        InputInjector inputInjector,
+        string accessToken)
     {
         _inputInjector = inputInjector;
+        _accessToken = accessToken;
 
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
@@ -76,6 +79,20 @@ public sealed class StreamingServer : IAsyncDisposable
         if (!context.WebSockets.IsWebSocketRequest)
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        string? providedToken = context.Request.Query["token"];
+        if (!string.IsNullOrEmpty(_accessToken) && !string.Equals(providedToken, _accessToken, StringComparison.Ordinal))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        // Security: allow only 1 active device at a time
+        if (_clients.Count >= 1)
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             return;
         }
 

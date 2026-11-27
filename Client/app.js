@@ -27,6 +27,13 @@
 
   const btnWebLang = document.getElementById("btn-web-lang");
   const txtWebSubtitle = document.getElementById("txt-web-subtitle");
+  const pinBox = document.getElementById("pin-box");
+  const inputPin = document.getElementById("input-pin");
+  const urlToken = new URLSearchParams(window.location.search).get("token") || "";
+  if (urlToken) {
+    inputPin.value = urlToken;
+    pinBox.classList.add("hidden");
+  }
   let webLang = navigator.language && navigator.language.toLowerCase().startsWith("vi") ? "vi" : "en";
 
   function applyWebLang() {
@@ -231,7 +238,8 @@
     }
 
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${proto}//${window.location.host}/ws`;
+    const token = encodeURIComponent((inputPin.value || urlToken || "").trim());
+    const wsUrl = `${proto}//${window.location.host}/ws?token=${token}`;
     showToast("Connecting...", 0);
 
     ws = new WebSocket(wsUrl);
