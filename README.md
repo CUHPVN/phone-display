@@ -20,10 +20,10 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 - **Dual-Mode Transport (USB & Wi-Fi)**:
   - **USB (`http://localhost:8080`)**: Automatic `adb reverse tcp:8080 tcp:8080` for near-zero latency.
   - **Wi-Fi (`https://<LAN-IP>:8443`)**: Auto-generated SAN self-signed X.509 certificate (prioritizing real Wi-Fi/Ethernet IPs over VPN adapters) so Chrome unlocks `WebCodecs`, `Fullscreen`, and `Wake Lock`.
-- **9remote-Style Input Modes**:
-  - **Trackpad (Default)**: 1-finger relative cursor with acceleration, tap = left click, double-tap & hold = drag, 450ms long-press or 2-finger tap = right click, 2-finger swipe = smooth scroll.
-  - **Touch**: Direct absolute touch & drag on the extended display.
-  - **View Only**: Locks touch input to prevent accidental clicks.
+- **Multi-Mode Touch, Trackpad & Keyboard Control**:
+  - **View Only (Default)**: Locks touch/mouse input to prevent accidental clicks.
+  - **Trackpad**: 1-finger relative cursor with acceleration, tap = left click, double-tap & hold = drag, 450ms long-press or 2-finger tap = right click, 2-finger swipe = smooth scroll.
+  - **Touch**: Direct absolute touch & drag on the extended display (tap 2nd finger for right-click on mobile; full mouse control on PC).
 - **Modern Windows 11 Desktop GUI & System Tray**: Custom dark titlebar, live FPS/Encode/Bitrate/Client stats, QR code generator, and minimize-to-tray support.
 - **Auto Resolution Matching**: Automatically matches secondary monitor resolution to the phone's aspect ratio (restored cleanly on stop/exit).
 
@@ -77,10 +77,10 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 - **Hỗ trợ cả USB & Wi-Fi**:
   - **Cáp USB (`http://localhost:8080`)**: Tự động chạy `adb reverse tcp:8080 tcp:8080` để đạt độ trễ thấp nhất.
   - **Wi-Fi LAN (`https://<IP-Wi-Fi>:8443`)**: Tự sinh chứng chỉ HTTPS SAN (tự lọc bỏ IP VPN ảo như Radmin/Hamachi để ưu tiên IP Wi-Fi/LAN thật) giúp Chrome mở khóa `WebCodecs`, `Fullscreen` và `Wake Lock`.
-- **Cảm ứng đa chế độ giống 9remote**:
-  - **Trackpad (Mặc định)**: 1 ngón rê chuột có gia tốc + chính xác từng pixel, chạm = click trái, chạm đúp giữ = kéo thả, nhấn giữ 450ms hoặc chạm 2 ngón = click phải, vuốt 2 ngón = cuộn trang.
-  - **Touch**: Chạm và kéo trực tiếp vào vị trí trên màn hình.
-  - **View Only**: Khóa cảm ứng để tránh bấm nhầm khi chỉ dùng để xem.
+- **Điều khiển đa chế độ (View Only / Trackpad / Touch) & Bàn phím**:
+  - **View Only (Mặc định)**: Khóa cảm ứng/chuột để tránh bấm nhầm khi chỉ dùng để xem.
+  - **Trackpad**: 1 ngón rê chuột có gia tốc + chính xác từng pixel, chạm = click trái, chạm đúp giữ = kéo thả, nhấn giữ 450ms hoặc chạm 2 ngón = click phải, vuốt 2 ngón = cuộn trang.
+  - **Touch**: Chạm và kéo trực tiếp vào vị trí trên màn hình (trên mobile chạm thêm ngón 2 để chuột phải; trên PC dùng như chuột thật).
 - **Giao diện Windows 11 hiện đại & Ẩn xuống System Tray**: Thanh tiêu đề tối đồng bộ, thông số FPS/Encode/Bitrate realtime, mã QR kết nối nhanh, nút thu nhỏ xuống khay hệ thống (System Tray) và menu chuột phải điều khiển nhanh.
 - **Tự động khớp độ phân giải**: Tự chỉnh độ phân giải màn hình phụ theo tỉ lệ điện thoại và khôi phục lại nguyên trạng khi bấm Dừng hoặc thoát app.
 
@@ -125,10 +125,10 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 - **USB & Wi-Fi デュアル接続**:
   - **USB 接続 (`http://localhost:8080`)**: `adb reverse tcp:8080 tcp:8080` を自動実行し、最小遅延で接続。
   - **Wi-Fi LAN (`https://<LAN-IP>:8443`)**: VPN アダプターを除外し実 LAN IP を優先して自己署名 SAN 証明書を自動生成。Chrome で `WebCodecs`・フルスクリーン・Wake Lock が利用可能。
-- **9remote 風マルチモード操作**:
-  - **Trackpad（デフォルト）**: 1本指で加速度付きカーソル移動、タップ＝左クリック、ダブルタップ＆ホールド＝ドラッグ、長押し(450ms)または2本指タップ＝右クリック、2本指スワイプ＝スクロール。
-  - **Touch**: 画面上のタッチ位置へ直接クリック＆ドラッグ。
-  - **View Only**: 誤操作を防ぐ閲覧専用ロックモード。
+- **マルチモード操作（View Only / Trackpad / Touch）＆ キーボード対応**:
+  - **View Only（デフォルト）**: 誤操作を防ぐ閲覧専用ロックモード。
+  - **Trackpad**: 1本指で加速度付きカーソル移動、タップ＝左クリック、ダブルタップ＆ホールド＝ドラッグ、長押し(450ms)または2本指タップ＝右クリック、2本指スワイプ＝スクロール。
+  - **Touch**: 画面上のタッチ位置へ直接クリック＆ドラッグ（モバイルでは2本目の指でタップして右クリック、PCでは通常マウス操作）。
 - **モダンな Windows 11 UI & システムトレイ格納**: ダークタイトルバー、リアルタイム FPS / エンコード遅延 / ビットレート表示、QR コード表示、タスクトレイ最小化＆右クリックメニュー対応。
 - **解像度自動調整**: 接続したスマホの画面比率に合わせて拡張モニターの解像度を自動変更し、終了時に元の設定へ復元。
 
@@ -169,10 +169,10 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 - **USB 与 Wi-Fi 双模式连接**:
   - **USB 数据线 (`http://localhost:8080`)**: 自动检测设备并执行 `adb reverse tcp:8080 tcp:8080`，实现近乎零延迟连接。
   - **Wi-Fi 局域网 (`https://<LAN-IP>:8443`)**: 自动过滤虚拟 VPN 网卡并优先选用真实 Wi-Fi/以太网 IP 生成自签名 SAN 证书，解锁 Chrome 的 `WebCodecs`、全屏和屏幕常亮（Wake Lock）。
-- **类 9remote 多模式触控**:
-  - **Trackpad（默认触控板模式）**: 单指相对移动（带加速度与亚像素累加）、单击＝左键、双击按住＝拖拽、长按(450ms)或双指轻点＝右键、双指滑动＝平滑滚动。
-  - **Touch（直触模式）**: 指哪点哪，直接映射屏幕绝对坐标。
-  - **View Only（仅观看模式）**: 锁定触控输入，防止误触。
+- **多模式触控（View Only / Trackpad / Touch）与键盘支持**:
+  - **View Only（默认模式）**: 锁定触控与鼠标输入，防止误触。
+  - **Trackpad**: 单指相对移动（带加速度与亚像素累加）、单击＝左键、双击按住＝拖拽、长按(450ms)或双指轻点＝右键、双指滑动＝平滑滚动。
+  - **Touch**: 指哪点哪，直接映射屏幕绝对坐标（手机端按住一点并用第二指轻点可触发右键；PC 端如普通鼠标一样使用）。
 - **现代 Windows 11 界面与系统托盘**: 深色自定义标题栏、实时 FPS / 编码延迟 / 码率 / 连接数面板、二维码直连、支持最小化到系统托盘及托盘右键快捷控制。
 - **自动匹配分辨率**: 根据手机屏幕比例自动匹配扩展屏分辨率，停止或退出时自动恢复原设置。
 
