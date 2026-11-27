@@ -3,19 +3,19 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="PhoneDisplay"
-        Width="860"
-        Height="680"
-        MinWidth="680"
-        MinHeight="580"
+        Width="880"
+        Height="700"
+        MinWidth="700"
+        MinHeight="600"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="CanResize"
-        Background="#0C0F14"
-        Foreground="#F4F4F5"
+        Background="#090B10"
+        Foreground="#F8FAFC"
         FontFamily="Segoe UI">
 
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="44"
+        <shell:WindowChrome CaptionHeight="46"
                             ResizeBorderThickness="6"
                             CornerRadius="8"
                             GlassFrameThickness="0"/>
@@ -23,9 +23,10 @@
 
     <Window.Resources>
         <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#161B26"/>
-            <Setter Property="Foreground" Value="#F4F4F5"/>
-            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Background" Value="#141923"/>
+            <Setter Property="Foreground" Value="#F8FAFC"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
@@ -34,11 +35,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#1D4ED8"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#1E3A8A"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#0284C7"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#2563EB"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -49,10 +50,11 @@
 
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="#141923"/>
-            <Setter Property="Foreground" Value="#F4F4F5"/>
-            <Setter Property="BorderBrush" Value="#252D3D"/>
+            <Setter Property="Foreground" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#263044"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Height" Value="36"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
@@ -63,7 +65,7 @@
                                           ClickMode="Press">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="Border" Background="#141923" BorderBrush="#263042" BorderThickness="1" CornerRadius="8">
+                                        <Border x:Name="Border" Background="#141923" BorderBrush="#263044" BorderThickness="1" CornerRadius="7">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
@@ -75,7 +77,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Border" Property="BorderBrush" Value="#38BDF8"/>
+                                                <Setter TargetName="Border" Property="BorderBrush" Value="#3B82F6"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -88,21 +90,21 @@
                                               Margin="12,0,30,0"
                                               VerticalAlignment="Center"
                                               HorizontalAlignment="Left"
-                                              TextElement.Foreground="#F4F4F5"/>
+                                              TextElement.Foreground="#F8FAFC"/>
                             <Popup x:Name="Popup"
                                    Placement="Bottom"
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    AllowsTransparency="True"
                                    Focusable="False"
-                                   PopupAnimation="Slide">
+                                   PopupAnimation="Fade">
                                 <Border x:Name="DropDownBorder"
                                         MinWidth="{TemplateBinding ActualWidth}"
                                         MaxHeight="{TemplateBinding MaxDropDownHeight}"
-                                        Background="#161B26"
+                                        Background="#141923"
                                         BorderBrush="#334155"
                                         BorderThickness="1"
-                                        CornerRadius="8"
-                                        Margin="0,3,0,0">
+                                        CornerRadius="7"
+                                        Margin="0,4,0,0">
                                     <ScrollViewer SnapsToDevicePixels="True">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
@@ -115,20 +117,29 @@
         </Style>
 
         <Style x:Key="CardBorder" TargetType="Border">
-            <Setter Property="Background" Value="#131720"/>
-            <Setter Property="BorderBrush" Value="#202736"/>
+            <Setter Property="Background" Value="#11151E"/>
+            <Setter Property="BorderBrush" Value="#1F2636"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="18"/>
         </Style>
 
-        <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#1B2230"/>
-            <Setter Property="Foreground" Value="#E2E8F0"/>
-            <Setter Property="BorderBrush" Value="#2B3548"/>
+        <Style x:Key="KpiTile" TargetType="Border">
+            <Setter Property="Background" Value="#151A25"/>
+            <Setter Property="BorderBrush" Value="#21293B"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12,9"/>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#1A2130"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="#2A354A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,0"/>
             <Setter Property="Height" Value="34"/>
+            <Setter Property="FontWeight" Value="Medium"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -137,14 +148,17 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8"
+                                CornerRadius="7"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#252F42"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#38BDF8"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#232D42"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3B82F6"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#161D2B"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -154,22 +168,22 @@
 
         <Style x:Key="TitleBarButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="Foreground" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Height" Value="32"/>
-            <Setter Property="MinWidth" Value="36"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="34"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="8,0">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="9,0">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#1E293B"/>
-                                <Setter Property="Foreground" Value="#F8FAFC"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -178,15 +192,15 @@
         </Style>
     </Window.Resources>
 
-    <Border BorderBrush="#202736" BorderThickness="1" CornerRadius="8" Background="#0C0F14">
+    <Border BorderBrush="#1F2636" BorderThickness="1" CornerRadius="8" Background="#090B10">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="44"/>
+                <RowDefinition Height="46"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
             <!-- Custom Dark Title Bar -->
-            <Border Grid.Row="0" Background="#0F131B" BorderBrush="#1C2331" BorderThickness="0,0,0,1" CornerRadius="8,8,0,0">
+            <Border Grid.Row="0" Background="#0D1018" BorderBrush="#1A2130" BorderThickness="0,0,0,1" CornerRadius="8,8,0,0">
                 <Grid Margin="16,0,10,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -195,9 +209,11 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="22" Height="22" CornerRadius="5" Margin="0,0,10,0" Background="#2563EB">
-                            <TextBlock Text="PD" FontSize="10.5" FontWeight="Bold" Foreground="#FFFFFF"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <!-- Crisp vector monitor+phone glyph -->
+                        <Border Width="26" Height="26" CornerRadius="6" Margin="0,0,10,0" Background="#16A34A">
+                            <Path Data="M4,6 H16 V14 H4 Z M8,16 H12" Stroke="#FFFFFF" StrokeThickness="1.7"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" Width="20" Height="20"/>
                         </Border>
                         <TextBlock Text="PhoneDisplay" FontSize="13.5" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"/>
                         <TextBlock x:Name="TxtTitleTag" Text="MÀN HÌNH PHỤ ANDROID" FontSize="10.5" FontWeight="Medium" Foreground="#64748B" Margin="10,0,0,0" VerticalAlignment="Center"/>
@@ -206,12 +222,23 @@
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="BtnFirewallOpen" Style="{StaticResource TitleBarButton}"
                                 ToolTip="Mở Windows Firewall (8080 &amp; 8443)" Click="BtnFirewallOpen_Click" Margin="0,0,2,0">
-                            <TextBlock x:Name="TxtFirewallOpenBtn" Text="Mở FW" FontSize="11.5" FontWeight="Medium" Foreground="#CBD5E1"/>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="M6,1 L11,3 V6.5 C11,9.5 8.8,11.5 6,12.5 C3.2,11.5 1,9.5 1,6.5 V3 Z"
+                                      Stroke="#22C55E" StrokeThickness="1.3" Width="12" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtFirewallOpenBtn" Text="Mở FW" FontSize="11.5" FontWeight="Medium" Foreground="#E2E8F0"/>
+                            </StackPanel>
                         </Button>
                         <Button x:Name="BtnFirewallClose" Style="{StaticResource TitleBarButton}"
                                 ToolTip="Khóa lại Windows Firewall (xóa rule 8080 &amp; 8443)" Click="BtnFirewallClose_Click" Margin="0,0,6,0">
-                            <TextBlock x:Name="TxtFirewallCloseBtn" Text="Khóa FW" FontSize="11.5" FontWeight="Medium" Foreground="#94A3B8"/>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="M3,6 H9 V11 H3 Z M4,6 V4 A2,2 0 0 1 8,4 V6"
+                                      Stroke="#94A3B8" StrokeThickness="1.3" Width="12" Height="12" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtFirewallCloseBtn" Text="Khóa FW" FontSize="11.5" FontWeight="Medium" Foreground="#94A3B8"/>
+                            </StackPanel>
                         </Button>
+
+                        <Border Width="1" Height="16" Background="#232B3D" Margin="2,0,6,0"/>
+
                         <Button x:Name="BtnLangToggle" Style="{StaticResource TitleBarButton}"
                                 ToolTip="Switch Language (VI / EN)" Click="BtnLangToggle_Click" Margin="0,0,2,0">
                             <TextBlock x:Name="TxtLangCode" Text="VI" FontSize="11.5" FontWeight="Bold" Foreground="#60A5FA"/>
@@ -221,10 +248,10 @@
                             <TextBlock x:Name="TxtHideToTray" Text="Khay" FontSize="11.5" FontWeight="Medium"/>
                         </Button>
                         <Button Style="{StaticResource TitleBarButton}" ToolTip="Thu nhỏ" Click="BtnMinimize_Click">
-                            <TextBlock Text="—" FontSize="12"/>
+                            <Path Data="M2,7 H10" Stroke="#CBD5E1" StrokeThickness="1.5" Width="12" Height="12"/>
                         </Button>
                         <Button Style="{StaticResource TitleBarButton}" ToolTip="Đóng (Alt+F4)" Click="BtnClose_Click">
-                            <TextBlock Text="✕" FontSize="12"/>
+                            <Path Data="M2,2 L10,10 M10,2 L2,10" Stroke="#CBD5E1" StrokeThickness="1.5" Width="12" Height="12"/>
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -232,269 +259,286 @@
 
             <!-- Body -->
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="20,16,20,18">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="14"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="14"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+                <Grid Margin="20,16,20,18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="14"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="14"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <!-- Hero Header -->
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel>
-                        <TextBlock x:Name="TxtHeroTitle" Text="Màn hình phụ không dây &amp; USB cho Windows 11"
-                                   FontSize="18" FontWeight="Bold" Foreground="#F8FAFC"/>
-                        <TextBlock x:Name="TxtHeroSub" Text="DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, hỗ trợ Touchpad &amp; Cảm ứng"
-                                   FontSize="12.5" Foreground="#94A3B8" Margin="0,3,0,0"/>
-                    </StackPanel>
-
-                    <Border Grid.Column="1" VerticalAlignment="Center" CornerRadius="999" Padding="14,7"
-                            x:Name="StatusBadge" Background="#141E2E" BorderBrush="#23324D" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#38BDF8" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="TxtStatusBadge" Text="Sẵn sàng" FontSize="12.5" FontWeight="SemiBold" Foreground="#38BDF8"/>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-
-                <!-- Main Two-Column Area -->
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" MinWidth="300"/>
-                        <ColumnDefinition Width="14"/>
-                        <ColumnDefinition Width="340" MinWidth="290"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left Card: Stream Configuration -->
-                    <Border Grid.Column="0" Style="{StaticResource CardBorder}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock x:Name="TxtSectionConfig" Text="CẤU HÌNH PHÁT HÌNH" FontSize="11" FontWeight="Bold" Foreground="#60A5FA" Margin="0,0,0,12"/>
-
-                            <StackPanel Grid.Row="1">
-                                <TextBlock x:Name="TxtTargetMonitor" Text="Màn hình mục tiêu" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="CmbMonitor" Grid.Column="0"/>
-                                    <Button x:Name="BtnRefreshMonitors" Grid.Column="2" Content="Làm mới"
-                                            Style="{StaticResource SecondaryButton}" Click="BtnRefreshMonitors_Click"/>
-                                </Grid>
-
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock x:Name="TxtFpsLabel" Text="Tần số quét (FPS)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CmbFps">
-                                            <ComboBoxItem Content="60 FPS (Khuyên dùng)" Tag="60" IsSelected="True"/>
-                                            <ComboBoxItem Content="90 FPS" Tag="90"/>
-                                            <ComboBoxItem Content="120 FPS (Cáp USB)" Tag="120"/>
-                                        </ComboBox>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock x:Name="TxtBitrateLabel" Text="Chất lượng (Bitrate)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="CmbBitrate">
-                                            <ComboBoxItem Content="8 Mbps (Nhẹ)" Tag="8000"/>
-                                            <ComboBoxItem Content="12 Mbps (Cân bằng)" Tag="12000" IsSelected="True"/>
-                                            <ComboBoxItem Content="20 Mbps (Nét)" Tag="20000"/>
-                                            <ComboBoxItem Content="30 Mbps (Tối đa)" Tag="30000"/>
-                                        </ComboBox>
-                                    </StackPanel>
-                                </Grid>
-
-                                <TextBlock x:Name="TxtEncoderLabel" Text="Bộ mã hóa Video (Encoder)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
-                                <ComboBox x:Name="CmbEncoder" Margin="0,0,0,14">
-                                    <ComboBoxItem Content="Tự động (NVENC RTX → x264)" Tag="auto" IsSelected="True"/>
-                                    <ComboBoxItem Content="NVIDIA NVENC (Phần cứng RTX)" Tag="nvenc"/>
-                                    <ComboBoxItem Content="CPU libx264" Tag="x264"/>
-                                </ComboBox>
-
-                                <CheckBox x:Name="ChkAutoRes" IsChecked="True" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
-                                          Content="Tự khớp độ phân giải màn hình phụ theo điện thoại"/>
-
-                                <CheckBox x:Name="ChkMinimizeToTrayOnClose" IsChecked="True" Foreground="#94A3B8" FontSize="12"
-                                          Content="Ẩn xuống System Tray khi bấm đóng (X)"/>
-
-                                <TextBlock x:Name="TxtErrorBanner" Text="" Foreground="#F87171" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,10,0,0" Visibility="Collapsed"/>
-                            </StackPanel>
-
-                            <Button x:Name="BtnToggleStream" Grid.Row="2" Height="44" FontSize="14.5" FontWeight="SemiBold"
-                                    Foreground="#FFFFFF" Background="#2563EB" BorderThickness="0" Cursor="Hand"
-                                    Content="Bắt đầu phát (Start)" Click="BtnToggleStream_Click" Margin="0,12,0,0">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                        </Grid>
-                    </Border>
-
-                    <!-- Right Card: Connection (USB + Wi-Fi QR) -->
-                    <Border Grid.Column="2" Style="{StaticResource CardBorder}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="TxtSectionConnect" Text="KẾT NỐI TRÊN ANDROID" FontSize="11" FontWeight="Bold" Foreground="#34D399" VerticalAlignment="Center"/>
-                                <Border Grid.Column="1" Background="#13221C" BorderBrush="#1F4032" BorderThickness="1" CornerRadius="6" Padding="8,3">
-                                    <TextBlock x:Name="TxtAccessPin" Text="PIN: ------" FontSize="11" FontWeight="Bold" FontFamily="Consolas" Foreground="#34D399"/>
-                                </Border>
-                            </Grid>
-
-                            <!-- USB Box -->
-                            <Border Grid.Row="1" Background="#0D111A" BorderBrush="#1E2636" BorderThickness="1"
-                                    CornerRadius="10" Padding="12" Margin="0,0,0,12">
-                                <StackPanel>
-                                    <TextBlock x:Name="TxtUsbTitle" Text="1. Cáp USB (Độ trễ thấp nhất)" FontSize="12.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                                    <TextBlock x:Name="TxtUsbStatus" Text="Đang kiểm tra ADB..." FontSize="11" Foreground="#94A3B8" Margin="0,3,0,8"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="TxtUsbUrl" Text="http://localhost:8080" IsReadOnly="True"
-                                                 Height="34" VerticalContentAlignment="Center"
-                                                 Background="#151C28" Foreground="#38BDF8" BorderThickness="0"
-                                                 Padding="10,0" FontFamily="Consolas" FontSize="12"/>
-                                        <Button x:Name="BtnCopyUsb" Grid.Column="2" Content="Copy" Style="{StaticResource SecondaryButton}"
-                                                Click="BtnCopyUsb_Click"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Wi-Fi QR Box -->
-                            <Border Grid.Row="2" Background="#0D111A" BorderBrush="#1E2636" BorderThickness="1"
-                                    CornerRadius="10" Padding="12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock x:Name="TxtWifiTitle" Text="2. Wi-Fi LAN (Quét QR bằng Chrome)" FontSize="12.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-
-                                    <Border Grid.Row="1" Background="#FFFFFF" CornerRadius="10" Padding="8"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,8">
-                                        <Image x:Name="ImgQrCode" Width="128" Height="128" Stretch="Uniform"
-                                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
-                                    </Border>
-
-                                    <Grid Grid.Row="2" Margin="0,4,0,6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="TxtLanUrl" Text="https://192.168.1.11:8443" IsReadOnly="True"
-                                                 Height="34" VerticalContentAlignment="Center"
-                                                 Background="#151C28" Foreground="#FBBF24" BorderThickness="0"
-                                                 Padding="10,0" FontFamily="Consolas" FontSize="12"/>
-                                        <Button x:Name="BtnCopyLan" Grid.Column="2" Content="Copy" Style="{StaticResource SecondaryButton}"
-                                                Click="BtnCopyLan_Click"/>
-                                    </Grid>
-
-                                    <TextBlock x:Name="TxtWifiHint" Grid.Row="3" Text="Lần đầu qua Wi-Fi: bấm Nâng cao → Tiếp tục truy cập"
-                                               FontSize="10.5" Foreground="#94A3B8" HorizontalAlignment="Center"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Optional Radmin / Remote PC Box -->
-                            <Border x:Name="PanelRadmin" Grid.Row="3" Background="#0D111A" BorderBrush="#1E2636" BorderThickness="1"
-                                    CornerRadius="10" Padding="10,8" Margin="0,10,0,0" Visibility="Collapsed">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Radmin / PC:" FontSize="11" FontWeight="SemiBold" Foreground="#A78BFA" VerticalAlignment="Center"/>
-                                    <TextBox x:Name="TxtVpnUrl" Grid.Column="2" Text="" IsReadOnly="True"
-                                             Background="#151C28" Foreground="#C4B5FD" BorderThickness="0"
-                                             Padding="8,5" FontFamily="Consolas" FontSize="11"/>
-                                    <Button x:Name="BtnCopyVpn" Grid.Column="4" Content="Copy" Style="{StaticResource SecondaryButton}"
-                                            Height="28" Padding="10,2" Click="BtnCopyVpn_Click"/>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </Border>
-                </Grid>
-
-                <!-- Bottom Live Stats Bar -->
-                <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="16,11">
-                    <Grid>
+                    <!-- Hero Header -->
+                    <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock x:Name="TxtHeroTitle" Text="Màn hình phụ không dây &amp; USB cho Windows 11"
+                                       FontSize="18" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+                            <TextBlock x:Name="TxtHeroSub" Text="DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, hỗ trợ Touchpad &amp; Cảm ứng"
+                                       FontSize="12.5" Foreground="#94A3B8" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" VerticalAlignment="Center" CornerRadius="7" Padding="12,6"
+                                x:Name="StatusBadge" Background="#141923" BorderBrush="#242E42" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#38BDF8" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtStatusBadge" Text="Sẵn sàng" FontSize="12" FontWeight="SemiBold" Foreground="#38BDF8"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Main Two-Column Area -->
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="300"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="345" MinWidth="295"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left Card: Stream Configuration -->
+                        <Border Grid.Column="0" Style="{StaticResource CardBorder}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock x:Name="TxtSectionConfig" Text="CẤU HÌNH PHÁT HÌNH" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,14"/>
+
+                                <StackPanel Grid.Row="1">
+                                    <TextBlock x:Name="TxtTargetMonitor" Text="Màn hình mục tiêu" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="CmbMonitor" Grid.Column="0"/>
+                                        <Button x:Name="BtnRefreshMonitors" Grid.Column="2" Content="Làm mới"
+                                                Style="{StaticResource SecondaryButton}" Height="36" Click="BtnRefreshMonitors_Click"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="12"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock x:Name="TxtFpsLabel" Text="Tần số quét (FPS)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                                            <ComboBox x:Name="CmbFps">
+                                                <ComboBoxItem Content="60 FPS (Khuyên dùng)" Tag="60" IsSelected="True"/>
+                                                <ComboBoxItem Content="90 FPS" Tag="90"/>
+                                                <ComboBoxItem Content="120 FPS (Cáp USB)" Tag="120"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock x:Name="TxtBitrateLabel" Text="Chất lượng (Bitrate)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                                            <ComboBox x:Name="CmbBitrate">
+                                                <ComboBoxItem Content="8 Mbps (Nhẹ)" Tag="8000"/>
+                                                <ComboBoxItem Content="12 Mbps (Cân bằng)" Tag="12000" IsSelected="True"/>
+                                                <ComboBoxItem Content="20 Mbps (Nét)" Tag="20000"/>
+                                                <ComboBoxItem Content="30 Mbps (Tối đa)" Tag="30000"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock x:Name="TxtEncoderLabel" Text="Bộ mã hóa Video (Encoder)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="CmbEncoder" Margin="0,0,0,16">
+                                        <ComboBoxItem Content="Tự động (NVENC RTX → x264)" Tag="auto" IsSelected="True"/>
+                                        <ComboBoxItem Content="NVIDIA NVENC (Phần cứng RTX)" Tag="nvenc"/>
+                                        <ComboBoxItem Content="CPU libx264" Tag="x264"/>
+                                    </ComboBox>
+
+                                    <CheckBox x:Name="ChkAutoRes" IsChecked="True" Foreground="#E2E8F0" FontSize="12" Margin="0,0,0,9" Cursor="Hand"
+                                              Content="Tự khớp độ phân giải màn hình phụ theo điện thoại"/>
+
+                                    <CheckBox x:Name="ChkMinimizeToTrayOnClose" IsChecked="True" Foreground="#94A3B8" FontSize="12" Cursor="Hand"
+                                              Content="Ẩn xuống System Tray khi bấm đóng (X)"/>
+
+                                    <TextBlock x:Name="TxtErrorBanner" Text="" Foreground="#F87171" FontSize="12"
+                                               TextWrapping="Wrap" Margin="0,10,0,0" Visibility="Collapsed"/>
+                                </StackPanel>
+
+                                <Button x:Name="BtnToggleStream" Grid.Row="2" Height="44" FontSize="14.5" FontWeight="SemiBold"
+                                        Foreground="#FFFFFF" Background="#16A34A" BorderThickness="0" Cursor="Hand"
+                                        Content="Bắt đầu phát (Start)" Click="BtnToggleStream_Click" Margin="0,14,0,0">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <!-- Right Card: Connection (USB + Wi-Fi QR + Radmin) -->
+                        <Border Grid.Column="2" Style="{StaticResource CardBorder}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="TxtSectionConnect" Text="KẾT NỐI TRÊN ANDROID" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1" Background="#14261C" BorderBrush="#1E462E" BorderThickness="1" CornerRadius="6" Padding="8,3">
+                                        <TextBlock x:Name="TxtAccessPin" Text="PIN: ------" FontSize="11" FontWeight="Bold" FontFamily="Consolas" Foreground="#4ADE80"/>
+                                    </Border>
+                                </Grid>
+
+                                <!-- USB Box -->
+                                <Border Grid.Row="1" Background="#0D1018" BorderBrush="#1D2536" BorderThickness="1"
+                                        CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <TextBlock x:Name="TxtUsbTitle" Text="1. Cáp USB (Độ trễ thấp nhất)" FontSize="12" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+                                        <TextBlock x:Name="TxtUsbStatus" Text="Đang kiểm tra ADB..." FontSize="11" Foreground="#94A3B8" Margin="0,3,0,8" TextTrimming="CharacterEllipsis"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="TxtUsbUrl" Text="http://localhost:8080" IsReadOnly="True"
+                                                     Height="34" VerticalContentAlignment="Center"
+                                                     Background="#141923" Foreground="#60A5FA" BorderThickness="0"
+                                                     Padding="10,0" FontFamily="Consolas" FontSize="11.5"/>
+                                            <Button x:Name="BtnCopyUsb" Grid.Column="2" Content="Copy" Style="{StaticResource SecondaryButton}"
+                                                    Click="BtnCopyUsb_Click"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Wi-Fi QR Box -->
+                                <Border Grid.Row="2" Background="#0D1018" BorderBrush="#1D2536" BorderThickness="1"
+                                        CornerRadius="8" Padding="12">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock x:Name="TxtWifiTitle" Text="2. Wi-Fi LAN (Quét QR bằng Chrome)" FontSize="12" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+
+                                        <Border Grid.Row="1" Background="#FFFFFF" CornerRadius="8" Padding="7"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,8">
+                                            <Image x:Name="ImgQrCode" Width="124" Height="124" Stretch="Uniform"
+                                                   RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                        </Border>
+
+                                        <Grid Grid.Row="2" Margin="0,4,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="TxtLanUrl" Text="https://192.168.1.11:8443" IsReadOnly="True"
+                                                     Height="34" VerticalContentAlignment="Center"
+                                                     Background="#141923" Foreground="#FBBF24" BorderThickness="0"
+                                                     Padding="10,0" FontFamily="Consolas" FontSize="11.5"/>
+                                            <Button x:Name="BtnCopyLan" Grid.Column="2" Content="Copy" Style="{StaticResource SecondaryButton}"
+                                                    Click="BtnCopyLan_Click"/>
+                                        </Grid>
+
+                                        <TextBlock x:Name="TxtWifiHint" Grid.Row="3" Text="Lần đầu qua Wi-Fi: bấm Nâng cao → Tiếp tục truy cập"
+                                                   FontSize="10.5" Foreground="#94A3B8" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Optional Radmin / Remote PC Box -->
+                                <Border x:Name="PanelRadmin" Grid.Row="3" Background="#0D1018" BorderBrush="#1D2536" BorderThickness="1"
+                                        CornerRadius="8" Padding="10,8" Margin="0,10,0,0" Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Radmin / PC" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="TxtVpnUrl" Grid.Column="2" Text="" IsReadOnly="True"
+                                                 Height="30" VerticalContentAlignment="Center"
+                                                 Background="#141923" Foreground="#C4B5FD" BorderThickness="0"
+                                                 Padding="8,0" FontFamily="Consolas" FontSize="11"/>
+                                        <Button x:Name="BtnCopyVpn" Grid.Column="4" Content="Copy" Style="{StaticResource SecondaryButton}"
+                                                Height="30" Padding="10,0" Click="BtnCopyVpn_Click"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Bottom Telemetry KPI Tiles -->
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
                             <ColumnDefinition Width="1.5*"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="FPS" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
-                            <TextBlock x:Name="StatFps" Text="-- / 60" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="ENCODE" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
-                            <TextBlock x:Name="StatEncMs" Text="-- ms" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="BITRATE" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
-                            <TextBlock x:Name="StatBitrate" Text="-- Mbps" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="3">
-                            <TextBlock x:Name="TxtStatClientsLabel" Text="THIẾT BỊ" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
-                            <TextBlock x:Name="StatClients" Text="0 kết nối" FontSize="15" FontWeight="Bold" Foreground="#34D399"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="4">
-                            <TextBlock Text="ENCODER" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
-                            <TextBlock x:Name="StatEncoder" Text="Chưa chạy" FontSize="13.5" FontWeight="SemiBold" Foreground="#38BDF8" TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
+                        <Border Grid.Column="0" Style="{StaticResource KpiTile}">
+                            <StackPanel>
+                                <TextBlock Text="FPS" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                                <TextBlock x:Name="StatFps" Text="-- / 60" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Style="{StaticResource KpiTile}">
+                            <StackPanel>
+                                <TextBlock Text="ENCODE" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                                <TextBlock x:Name="StatEncMs" Text="-- ms" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="4" Style="{StaticResource KpiTile}">
+                            <StackPanel>
+                                <TextBlock Text="BITRATE" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                                <TextBlock x:Name="StatBitrate" Text="-- Mbps" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="6" Style="{StaticResource KpiTile}">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtStatClientsLabel" Text="THIẾT BỊ" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                                <TextBlock x:Name="StatClients" Text="0 kết nối" FontSize="15" FontWeight="Bold" Foreground="#4ADE80" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="8" Style="{StaticResource KpiTile}">
+                            <StackPanel>
+                                <TextBlock Text="ENCODER" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                                <TextBlock x:Name="StatEncoder" Text="Chưa chạy" FontSize="13.5" FontWeight="SemiBold" Foreground="#60A5FA" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Border>
                     </Grid>
-                </Border>
-            </Grid>
+                </Grid>
             </ScrollViewer>
         </Grid>
     </Border>

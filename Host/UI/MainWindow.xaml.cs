@@ -467,7 +467,7 @@ public partial class MainWindow : Window
 
         SetControlsEnabled(true);
         BtnToggleStream.Content = AppStrings.Get(_lang, "BtnStart");
-        BtnToggleStream.Background = new SolidColorBrush(MediaColor.FromRgb(37, 99, 235));
+        BtnToggleStream.Background = new SolidColorBrush(MediaColor.FromRgb(22, 163, 74));
         if (_trayToggleItem is not null) _trayToggleItem.Text = AppStrings.Get(_lang, "BtnStart");
         SetStatusBadge(AppStrings.Get(_lang, "StatusReady"), MediaColor.FromRgb(56, 189, 248));
         StatEncoder.Text = AppStrings.Get(_lang, "EncoderIdle");
