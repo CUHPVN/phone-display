@@ -24,6 +24,7 @@ public partial class MainWindow : Window
 {
     private readonly DisplayManager _displayManager = new();
     private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromMilliseconds(2400) };
     private readonly int _httpPort = 8080;
     private readonly int _httpsPort = 8443;
 
@@ -67,6 +68,25 @@ public partial class MainWindow : Window
 
         _uiTimer.Tick += UiTimer_Tick;
         _uiTimer.Start();
+        _toastTimer.Tick += (_, _) =>
+        {
+            _toastTimer.Stop();
+            ToastBanner.Visibility = Visibility.Collapsed;
+        };
+    }
+
+    private void ShowToast(string message, bool isWarning = false)
+    {
+        TxtToastMessage.Text = message;
+        ToastDot.Fill = new SolidColorBrush(isWarning
+            ? MediaColor.FromRgb(251, 191, 36)
+            : MediaColor.FromRgb(74, 222, 128));
+        ToastBanner.BorderBrush = new SolidColorBrush(isWarning
+            ? MediaColor.FromRgb(217, 119, 6)
+            : MediaColor.FromRgb(37, 99, 235));
+        ToastBanner.Visibility = Visibility.Visible;
+        _toastTimer.Stop();
+        _toastTimer.Start();
     }
 
     private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -161,6 +181,7 @@ public partial class MainWindow : Window
         _lang = _lang == AppLanguage.Vi ? AppLanguage.En : AppLanguage.Vi;
         ApplyLanguage();
         RefreshMonitorList();
+        ShowToast(AppStrings.Get(_lang, "ToastLangChanged"));
     }
 
     private void ApplyLanguage()
@@ -255,11 +276,17 @@ public partial class MainWindow : Window
     private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
 
-    private void BtnRotatePin_Click(object sender, RoutedEventArgs e)
+    private async void BtnRotatePin_Click(object sender, RoutedEventArgs e)
     {
-        if (_isStreaming) return;
+        if (_isStreaming)
+        {
+            ShowToast(AppStrings.Get(_lang, "ToastStopToRotatePin"), isWarning: true);
+            return;
+        }
         _accessPin = GeneratePin();
         InitializeNetworkPreview();
+        ShowToast($"{AppStrings.Get(_lang, "ToastPinChanged")}: {_accessPin}");
+        await FlashButtonTextAsync(BtnRotatePin, AppStrings.Get(_lang, "Copied").Contains("copy") ? "OK" : "Done");
     }
 
     private void InitializeNetworkPreview()
@@ -340,7 +367,11 @@ public partial class MainWindow : Window
             CmbMonitor.SelectedIndex = selectedBefore >= 0 && selectedBefore < CmbMonitor.Items.Count ? selectedBefore : defaultIdx;
     }
 
-    private void BtnRefreshMonitors_Click(object sender, RoutedEventArgs e) => RefreshMonitorList();
+    private void BtnRefreshMonitors_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshMonitorList();
+        ShowToast($"{AppStrings.Get(_lang, "ToastMonitorsRefreshed")} ({_monitors.Count})");
+    }
 
     private async void BtnToggleStream_Click(object sender, RoutedEventArgs e)
     {
@@ -476,6 +507,7 @@ public partial class MainWindow : Window
             BtnToggleStream.Background = new SolidColorBrush(MediaColor.FromRgb(220, 38, 38));
             if (_trayToggleItem is not null) _trayToggleItem.Text = AppStrings.Get(_lang, "BtnStop");
             SetStatusBadge(AppStrings.Get(_lang, "StatusStreaming"), MediaColor.FromRgb(52, 211, 153));
+            ShowToast($"{AppStrings.Get(_lang, "ToastStreamStarted")} ({selectedMonitor.DeviceName})");
         }
         catch (Exception ex)
         {
@@ -520,6 +552,7 @@ public partial class MainWindow : Window
         SetStatusBadge(AppStrings.Get(_lang, "StatusReady"), MediaColor.FromRgb(56, 189, 248));
         StatEncoder.Text = AppStrings.Get(_lang, "EncoderIdle");
         StatClients.Text = $"0 {AppStrings.Get(_lang, "ClientsSuffix")}";
+        ShowToast(AppStrings.Get(_lang, "ToastStreamStopped"));
     }
 
     private void SetStatusBadge(string text, MediaColor color)
@@ -669,7 +702,6 @@ public partial class MainWindow : Window
         CmbBitrate.IsEnabled = enabled;
         CmbEncoder.IsEnabled = enabled;
         ChkAutoRes.IsEnabled = enabled;
-        BtnRotatePin.IsEnabled = enabled;
     }
 
     private void ShowError(string message)
@@ -721,18 +753,21 @@ public partial class MainWindow : Window
     private async void BtnCopyUsb_Click(object sender, RoutedEventArgs e)
     {
         System.Windows.Clipboard.SetText(TxtUsbUrl.Text);
+        ShowToast($"{AppStrings.Get(_lang, "Copied")}: USB URL");
         await FlashButtonTextAsync(BtnCopyUsb, AppStrings.Get(_lang, "Copied"));
     }
 
     private async void BtnCopyLan_Click(object sender, RoutedEventArgs e)
     {
         System.Windows.Clipboard.SetText(TxtLanUrl.Text);
+        ShowToast($"{AppStrings.Get(_lang, "Copied")}: Wi-Fi URL");
         await FlashButtonTextAsync(BtnCopyLan, AppStrings.Get(_lang, "Copied"));
     }
 
     private async void BtnCopyVpn_Click(object sender, RoutedEventArgs e)
     {
         System.Windows.Clipboard.SetText(TxtVpnUrl.Text);
+        ShowToast($"{AppStrings.Get(_lang, "Copied")}: Radmin URL");
         await FlashButtonTextAsync(BtnCopyVpn, AppStrings.Get(_lang, "Copied"));
     }
 
@@ -775,6 +810,7 @@ public partial class MainWindow : Window
             if (proc is { ExitCode: 0 })
             {
                 HideError();
+                ShowToast(successMessage);
                 System.Windows.MessageBox.Show(
                     successMessage,
                     "PhoneDisplay Firewall",

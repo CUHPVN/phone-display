@@ -634,6 +634,17 @@
                         </StackPanel>
                     </Grid>
                 </ScrollViewer>
+
+                <!-- Non-intrusive Action Feedback Toast -->
+                <Border x:Name="ToastBanner" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                        Margin="0,0,22,16" Padding="14,9" CornerRadius="8"
+                        Background="#172030" BorderBrush="#2563EB" BorderThickness="1"
+                        Visibility="Collapsed" IsHitTestVisible="False">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse x:Name="ToastDot" Width="7" Height="7" Fill="#4ADE80" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtToastMessage" Text="" FontSize="12.5" FontWeight="Medium" Foreground="#F8FAFC"/>
+                    </StackPanel>
+                </Border>
             </Grid>
 
             <!-- Persistent Bottom Telemetry KPI Bar -->
