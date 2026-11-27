@@ -43,8 +43,9 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 ### Prerequisites
 1. **Windows 11 (x64)** with **.NET SDK / Desktop + ASP.NET Core Runtime** (project targets `net11.0-windows`; change `<TargetFramework>` in `Host/PhoneDisplay.Host.csproj` to `net8.0-windows` if building on .NET 8).
 2. **FFmpeg** (`ffmpeg.exe`) in `PATH` or installed via `winget install Gyan.FFmpeg.Essentials`.
-3. **Virtual Display Driver** (to create a real extended monitor):
-   - Install via `winget install VirtualDrivers.Virtual-Display-Driver` (or from [Virtual-Display-Driver](https://github.com/itsmikethetech/Virtual-Display-Driver/releases)).
+3. **Virtual Display Driver** (required **only if** you want an independent extended 2nd monitor):
+   > **Note (Mirror vs. Extended Monitor):** If you only want to **mirror** your main laptop screen, you **do NOT need** Virtual Display Driver. If you want a **true 2nd extended screen** side-by-side with your laptop, installing Virtual Display Driver (or plugging in an HDMI dummy plug) is **required**.
+   - Install via `winget install VirtualDrivers.Virtual-Display-Driver` (or from [Virtual-Display-Driver](https://github.com/itsmikethetech/Virtual-Display-Driver/releases)), then open **VDD Control** to install the driver and enable 1 virtual display.
    - Run PowerShell as Administrator:
      ```powershell
      .\Scripts\setup-virtual-display.ps1 -AddFirewallRules
@@ -85,7 +86,8 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 ### Yêu cầu hệ thống
 1. **Windows 11 (x64)** đã cài **.NET Runtime / SDK**.
 2. **FFmpeg**: Cài nhanh bằng `winget install Gyan.FFmpeg.Essentials`.
-3. **Virtual Display Driver** (để tạo màn hình phụ mở rộng cạnh laptop):
+3. **Virtual Display Driver** (**chỉ bắt buộc** nếu muốn tạo màn hình phụ mở rộng thứ 2):
+   > **Lưu ý quan trọng (Mirror vs. Màn thứ 2 ảo):** Nếu bạn chỉ cần **phản chiếu (Mirror)** màn hình chính của laptop sang điện thoại thì **KHÔNG cần cài VDD**. Nếu bạn muốn **mở rộng thêm 1 màn hình thứ 2 độc lập** bên cạnh laptop (kéo cửa sổ riêng sang điện thoại), bạn **bắt buộc phải cài Virtual Display Driver** (hoặc cắm đầu giả HDMI dummy plug).
    - Cài bằng `winget install VirtualDrivers.Virtual-Display-Driver` (sau đó mở **VDD Control** để cài driver và bật 1 màn hình ảo).
    - Mở PowerShell bằng quyền **Administrator** để thêm độ phân giải Android (`1600x720`, `1920x864`, `2340x1080`, `2400x1080`) và mở cổng Firewall (`8080`, `8443`):
      ```powershell
@@ -131,7 +133,8 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 ### 必要環境
 1. **Windows 11 (x64)**（.NET Desktop + ASP.NET Core Runtime）
 2. **FFmpeg**: `winget install Gyan.FFmpeg.Essentials`
-3. **Virtual Display Driver**（独立した拡張モニターを作成する場合）:
+3. **Virtual Display Driver**（独立した拡張2ndモニターを使う場合のみ必須）:
+   > **注意（ミラーリングと仮想2ndモニターの違い）:** メイン画面をそのまま**ミラーリング**するだけなら **VDD のインストールは不要**です。ノートPCの横に**独立した2枚目の拡張モニター**を追加したい場合は、**Virtual Display Driver (VDD)** の導入（またはHDMIダミープラグ）が**必須**になります。
    - `winget install VirtualDrivers.Virtual-Display-Driver` でインストール後、**VDD Control** からドライバーを導入し仮想モニターを有効化。
    - 管理者権限の PowerShell で Android 解像度追加とファイアウォール開放を実行：
      ```powershell
@@ -173,7 +176,8 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 ### 环境要求
 1. **Windows 11 (x64)**（已安装 .NET Runtime / SDK）。
 2. **FFmpeg**: 通过 `winget install Gyan.FFmpeg.Essentials` 安装。
-3. **虚拟显示器驱动 (Virtual Display Driver)**（用于创建独立扩展屏）:
+3. **虚拟显示器驱动 (Virtual Display Driver)**（仅在需要独立扩展副屏时必装）:
+   > **重要提示（镜像 vs. 虚拟第二块屏幕）：** 如果只需要将电脑主屏**镜像**到手机上，**无需安装 VDD**；如果需要在笔记本旁边**扩展出独立的第二块屏幕**（可单独拖放窗口），则**必须安装 Virtual Display Driver (VDD)**（或插上 HDMI 显卡欺骗器）。
    - 通过 `winget install VirtualDrivers.Virtual-Display-Driver` 安装后，打开 **VDD Control** 安装驱动并启用 1 个虚拟显示器。
    - 以管理员身份运行 PowerShell 添加常见 Android 分辨率并放行防火墙端口（`8080`、`8443`）：
      ```powershell
