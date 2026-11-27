@@ -29,10 +29,13 @@ public sealed unsafe class ScreenCapturer : IDisposable
     private int _cursorY;
 
     private bool _hasLastFrame;
+    private bool _useGdiFallback;
     private bool _disposed;
 
     public int Width { get; private set; }
     public int Height { get; private set; }
+    public bool IsUsingGdiFallback => _useGdiFallback;
+    public string? LastCaptureError { get; private set; }
     public event Action<int, int>? ResolutionChanged;
 
     public ScreenCapturer(MonitorInfo monitor)
@@ -76,6 +79,7 @@ public sealed unsafe class ScreenCapturer : IDisposable
         if (_adapter.EnumOutputs(_outputIndex, out IDXGIOutput output).Failure)
             throw new InvalidOperationException($"DXGI output {_outputIndex} not found on adapter {_adapterIndex}.");
 
+        _useGdiFallback = false;
         using (output)
         {
             var desc = output.Description;
@@ -91,48 +95,32 @@ public sealed unsafe class ScreenCapturer : IDisposable
             try
             {
                 _duplication = output1.DuplicateOutput(_device);
+
+                var texDesc = new Texture2DDescription
+                {
+                    Width = Width,
+                    Height = Height,
+                    MipLevels = 1,
+                    ArraySize = 1,
+                    Format = Format.B8G8R8A8_UNorm,
+                    SampleDescription = new SampleDescription(1, 0),
+                    Usage = ResourceUsage.Staging,
+                    BindFlags = BindFlags.None,
+                    CPUAccessFlags = CpuAccessFlags.Read,
+                    MiscFlags = ResourceOptionFlags.None
+                };
+                _stagingTexture = _device.CreateTexture2D(texDesc);
             }
             catch (SharpGen.Runtime.SharpGenException ex)
             {
-                // Fallback to IDXGIOutput5.DuplicateOutput1 for Windows 11 HDR / 10-bit panels
-                using var output5 = output.QueryInterfaceOrNull<IDXGIOutput5>();
-                if (output5 is not null)
-                {
-                    try
-                    {
-                        _duplication = output5.DuplicateOutput1(_device, 0, [Format.B8G8R8A8_UNorm]);
-                    }
-                    catch (SharpGen.Runtime.SharpGenException ex2)
-                    {
-                        CleanupDuplication();
-                        throw new InvalidOperationException(
-                            $"DuplicateOutput/1 failed on adapter {_adapterIndex} output {_outputIndex} ({Width}x{Height}): {ex2.ResultCode} - {ex2.Message}",
-                            ex2);
-                    }
-                }
-                else
-                {
-                    CleanupDuplication();
-                    throw new InvalidOperationException(
-                        $"DuplicateOutput failed on adapter {_adapterIndex} output {_outputIndex} ({Width}x{Height}): {ex.ResultCode} - {ex.Message}",
-                        ex);
-                }
+                // Fall back to GDI BitBlt capture if DXGI Desktop Duplication is unavailable (e.g. session/DPI/driver restriction)
+                LastCaptureError = $"DXGI fallback to GDI: {ex.ResultCode}";
+                _duplication?.Dispose();
+                _duplication = null;
+                _stagingTexture?.Dispose();
+                _stagingTexture = null;
+                _useGdiFallback = true;
             }
-
-            var texDesc = new Texture2DDescription
-            {
-                Width = Width,
-                Height = Height,
-                MipLevels = 1,
-                ArraySize = 1,
-                Format = Format.B8G8R8A8_UNorm,
-                SampleDescription = new SampleDescription(1, 0),
-                Usage = ResourceUsage.Staging,
-                BindFlags = BindFlags.None,
-                CPUAccessFlags = CpuAccessFlags.Read,
-                MiscFlags = ResourceOptionFlags.None
-            };
-            _stagingTexture = _device.CreateTexture2D(texDesc);
 
             int requiredBytes = Width * Height * 4;
             if (_frameBuffer.Length != requiredBytes)
@@ -155,6 +143,18 @@ public sealed unsafe class ScreenCapturer : IDisposable
         bgraFrame = default;
         isNewDesktopImage = false;
         if (_disposed) return false;
+
+        if (_useGdiFallback)
+        {
+            if (TryCaptureInitialGdiFrame())
+            {
+                _hasLastFrame = true;
+                isNewDesktopImage = true;
+                bgraFrame = _frameBuffer;
+                return true;
+            }
+            return false;
+        }
 
         if (_duplication is null || _context is null || _stagingTexture is null)
         {
@@ -455,12 +455,13 @@ public sealed unsafe class ScreenCapturer : IDisposable
             return false;
 
         nint hdcScreen = GetDC(nint.Zero);
-        if (hdcScreen == nint.Zero) return false;
+        if (hdcScreen == nint.Zero) { LastCaptureError = "GetDC(0) returned 0"; return false; }
 
         nint hdcMem = CreateCompatibleDC(hdcScreen);
         nint hBitmap = CreateCompatibleBitmap(hdcScreen, Width, Height);
         if (hdcMem == nint.Zero || hBitmap == nint.Zero)
         {
+            LastCaptureError = $"CreateCompatibleDC/Bitmap failed ({hdcMem}, {hBitmap})";
             if (hBitmap != nint.Zero) DeleteObject(hBitmap);
             if (hdcMem != nint.Zero) DeleteDC(hdcMem);
             ReleaseDC(nint.Zero, hdcScreen);
@@ -471,7 +472,14 @@ public sealed unsafe class ScreenCapturer : IDisposable
         try
         {
             if (!BitBlt(hdcMem, 0, 0, Width, Height, hdcScreen, _monitorLeft, _monitorTop, SRCCOPY))
+            {
+                LastCaptureError = $"BitBlt failed (err={Marshal.GetLastWin32Error()})";
                 return false;
+            }
+
+            // MSDN: bitmap must not be selected into a DC when calling GetDIBits
+            SelectObject(hdcMem, oldObj);
+            oldObj = nint.Zero;
 
             var bmi = new BITMAPINFO
             {
@@ -489,12 +497,15 @@ public sealed unsafe class ScreenCapturer : IDisposable
             fixed (byte* pDst = _frameBuffer)
             {
                 int lines = GetDIBits(hdcMem, hBitmap, 0, (uint)Height, (nint)pDst, ref bmi, DIB_RGB_COLORS);
+                if (lines <= 0)
+                    LastCaptureError = $"GetDIBits returned {lines}";
                 return lines > 0;
             }
         }
         finally
         {
-            SelectObject(hdcMem, oldObj);
+            if (oldObj != nint.Zero)
+                SelectObject(hdcMem, oldObj);
             DeleteObject(hBitmap);
             DeleteDC(hdcMem);
             ReleaseDC(nint.Zero, hdcScreen);
