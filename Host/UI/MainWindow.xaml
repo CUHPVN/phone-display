@@ -3,10 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="PhoneDisplay"
-        Width="840"
+        Width="860"
         Height="680"
-        MinWidth="740"
-        MinHeight="620"
+        MinWidth="680"
+        MinHeight="580"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -204,9 +204,13 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="BtnFirewall" Style="{StaticResource TitleBarButton}"
-                                ToolTip="Mở Windows Firewall (8080 &amp; 8443)" Click="BtnFirewall_Click" Margin="0,0,2,0">
-                            <TextBlock x:Name="TxtFirewallBtn" Text="Firewall" FontSize="11.5" FontWeight="Medium" Foreground="#CBD5E1"/>
+                        <Button x:Name="BtnFirewallOpen" Style="{StaticResource TitleBarButton}"
+                                ToolTip="Mở Windows Firewall (8080 &amp; 8443)" Click="BtnFirewallOpen_Click" Margin="0,0,2,0">
+                            <TextBlock x:Name="TxtFirewallOpenBtn" Text="Mở FW" FontSize="11.5" FontWeight="Medium" Foreground="#CBD5E1"/>
+                        </Button>
+                        <Button x:Name="BtnFirewallClose" Style="{StaticResource TitleBarButton}"
+                                ToolTip="Khóa lại Windows Firewall (xóa rule 8080 &amp; 8443)" Click="BtnFirewallClose_Click" Margin="0,0,6,0">
+                            <TextBlock x:Name="TxtFirewallCloseBtn" Text="Khóa FW" FontSize="11.5" FontWeight="Medium" Foreground="#94A3B8"/>
                         </Button>
                         <Button x:Name="BtnLangToggle" Style="{StaticResource TitleBarButton}"
                                 ToolTip="Switch Language (VI / EN)" Click="BtnLangToggle_Click" Margin="0,0,2,0">
@@ -227,7 +231,8 @@
             </Border>
 
             <!-- Body -->
-            <Grid Grid.Row="1" Margin="20,16,20,18">
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="20,16,20,18">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="14"/>
@@ -262,9 +267,9 @@
                 <!-- Main Two-Column Area -->
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.12*"/>
+                        <ColumnDefinition Width="*" MinWidth="300"/>
                         <ColumnDefinition Width="14"/>
-                        <ColumnDefinition Width="0.88*"/>
+                        <ColumnDefinition Width="340" MinWidth="290"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Left Card: Stream Configuration -->
@@ -386,8 +391,9 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="TxtUsbUrl" Text="http://localhost:8080" IsReadOnly="True"
+                                                 Height="34" VerticalContentAlignment="Center"
                                                  Background="#151C28" Foreground="#38BDF8" BorderThickness="0"
-                                                 Padding="10,7" FontFamily="Consolas" FontSize="12"/>
+                                                 Padding="10,0" FontFamily="Consolas" FontSize="12"/>
                                         <Button x:Name="BtnCopyUsb" Grid.Column="2" Content="Copy" Style="{StaticResource SecondaryButton}"
                                                 Click="BtnCopyUsb_Click"/>
                                     </Grid>
@@ -420,8 +426,9 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="TxtLanUrl" Text="https://192.168.1.11:8443" IsReadOnly="True"
+                                                 Height="34" VerticalContentAlignment="Center"
                                                  Background="#151C28" Foreground="#FBBF24" BorderThickness="0"
-                                                 Padding="10,7" FontFamily="Consolas" FontSize="12"/>
+                                                 Padding="10,0" FontFamily="Consolas" FontSize="12"/>
                                         <Button x:Name="BtnCopyLan" Grid.Column="2" Content="Copy" Style="{StaticResource SecondaryButton}"
                                                 Click="BtnCopyLan_Click"/>
                                     </Grid>
@@ -488,6 +495,7 @@
                     </Grid>
                 </Border>
             </Grid>
+            </ScrollViewer>
         </Grid>
     </Border>
 </Window>

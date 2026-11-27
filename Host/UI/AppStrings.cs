@@ -15,10 +15,14 @@ public static class AppStrings
 
         (AppLanguage.Vi, "HideTray") => "Khay",
         (AppLanguage.En, "HideTray") => "Tray",
-        (AppLanguage.Vi, "BtnFirewall") => "Firewall",
-        (AppLanguage.En, "BtnFirewall") => "Firewall",
+        (AppLanguage.Vi, "BtnFirewallOpen") => "Mở FW",
+        (AppLanguage.En, "BtnFirewallOpen") => "Open FW",
+        (AppLanguage.Vi, "BtnFirewallClose") => "Khóa FW",
+        (AppLanguage.En, "BtnFirewallClose") => "Lock FW",
         (AppLanguage.Vi, "FirewallOk") => "Đã mở cổng Firewall 8080 & 8443 cho LAN / Radmin VPN!",
         (AppLanguage.En, "FirewallOk") => "Opened Firewall ports 8080 & 8443 for LAN / Radmin VPN!",
+        (AppLanguage.Vi, "FirewallClosedOk") => "Đã xóa rule và khóa lại cổng Firewall 8080 & 8443!",
+        (AppLanguage.En, "FirewallClosedOk") => "Removed rules and locked Firewall ports 8080 & 8443!",
         (AppLanguage.Vi, "FirewallCancelled") => "Chưa cấp quyền Administrator để mở Firewall.",
         (AppLanguage.En, "FirewallCancelled") => "Administrator permission was cancelled.",
 

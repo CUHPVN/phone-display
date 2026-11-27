@@ -151,7 +151,8 @@ public partial class MainWindow : Window
         TxtLangCode.Text = _lang == AppLanguage.Vi ? "VI" : "EN";
         TxtTitleTag.Text = S("TitleTag");
         TxtHideToTray.Text = S("HideTray");
-        TxtFirewallBtn.Text = S("BtnFirewall");
+        TxtFirewallOpenBtn.Text = S("BtnFirewallOpen");
+        TxtFirewallCloseBtn.Text = S("BtnFirewallClose");
         TxtHeroTitle.Text = S("HeroTitle");
         TxtHeroSub.Text = S("HeroSub");
         TxtSectionConfig.Text = S("SectionConfig");
@@ -679,16 +680,30 @@ public partial class MainWindow : Window
         await FlashButtonTextAsync(BtnCopyVpn, AppStrings.Get(_lang, "Copied"));
     }
 
-    private void BtnFirewall_Click(object sender, RoutedEventArgs e)
+    private void BtnFirewallOpen_Click(object sender, RoutedEventArgs e)
+    {
+        string cmdArgs =
+            "/c \"netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8080\\\" >nul 2>&1 & " +
+            "netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8443\\\" >nul 2>&1 & " +
+            "netsh advfirewall firewall add rule name=\\\"PhoneDisplay TCP 8080\\\" dir=in action=allow protocol=TCP localport=8080 profile=any & " +
+            "netsh advfirewall firewall add rule name=\\\"PhoneDisplay TCP 8443\\\" dir=in action=allow protocol=TCP localport=8443 profile=any\"";
+
+        RunElevatedFirewallCommand(cmdArgs, AppStrings.Get(_lang, "FirewallOk"));
+    }
+
+    private void BtnFirewallClose_Click(object sender, RoutedEventArgs e)
+    {
+        string cmdArgs =
+            "/c \"netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8080\\\" >nul 2>&1 & " +
+            "netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8443\\\" >nul 2>&1\"";
+
+        RunElevatedFirewallCommand(cmdArgs, AppStrings.Get(_lang, "FirewallClosedOk"));
+    }
+
+    private void RunElevatedFirewallCommand(string cmdArgs, string successMessage)
     {
         try
         {
-            string cmdArgs =
-                "/c \"netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8080\\\" >nul 2>&1 & " +
-                "netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8443\\\" >nul 2>&1 & " +
-                "netsh advfirewall firewall add rule name=\\\"PhoneDisplay TCP 8080\\\" dir=in action=allow protocol=TCP localport=8080 profile=any & " +
-                "netsh advfirewall firewall add rule name=\\\"PhoneDisplay TCP 8443\\\" dir=in action=allow protocol=TCP localport=8443 profile=any\"";
-
             var psi = new ProcessStartInfo
             {
                 FileName = "cmd.exe",
@@ -705,7 +720,7 @@ public partial class MainWindow : Window
             {
                 HideError();
                 System.Windows.MessageBox.Show(
-                    AppStrings.Get(_lang, "FirewallOk"),
+                    successMessage,
                     "PhoneDisplay Firewall",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
