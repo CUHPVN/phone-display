@@ -274,9 +274,11 @@ public partial class MainWindow : Window
             : $"https://127.0.0.1:{_httpsPort}/?token={_accessPin}";
 
         var usbIp = SelfSignedCertGenerator.GetUsbTetheringIPv4Address();
-        TxtUsbUrl.Text = usbIp is not null
+        string usbUrl = usbIp is not null
             ? $"https://{usbIp}:{_httpsPort}/?token={_accessPin}"
             : $"http://localhost:{_httpPort}/?token={_accessPin}";
+        TxtUsbUrl.Text = usbUrl;
+        ImgUsbQrCode.Source = GenerateQrBitmap(usbUrl);
         TxtLanUrl.Text = lanUrl;
         TxtAccessPin.Text = $"PIN: {_accessPin}";
         TxtSidebarPin.Text = _accessPin;
@@ -584,16 +586,23 @@ public partial class MainWindow : Window
     {
         _networkCheckTicks++;
         var usbIp = SelfSignedCertGenerator.GetUsbTetheringIPv4Address();
+        string targetUsbUrl;
         if (usbIp is not null)
         {
             TxtUsbStatus.Text = AppStrings.Get(_lang, "UsbTetheringReady");
-            TxtUsbUrl.Text = $"https://{usbIp}:{_httpsPort}/?token={_accessPin}";
+            targetUsbUrl = $"https://{usbIp}:{_httpsPort}/?token={_accessPin}";
         }
         else
         {
-            TxtUsbUrl.Text = $"http://localhost:{_httpPort}/?token={_accessPin}";
+            targetUsbUrl = $"http://localhost:{_httpPort}/?token={_accessPin}";
             if (_adbHelper is not null)
                 TxtUsbStatus.Text = _adbHelper.StatusSummary;
+        }
+
+        if (TxtUsbUrl.Text != targetUsbUrl)
+        {
+            TxtUsbUrl.Text = targetUsbUrl;
+            ImgUsbQrCode.Source = GenerateQrBitmap(targetUsbUrl);
         }
 
         if (!_isStreaming && _networkCheckTicks % 8 == 0)

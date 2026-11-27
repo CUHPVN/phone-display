@@ -476,7 +476,10 @@
                                     <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                                         <StackPanel>
                                             <TextBlock x:Name="TxtUsbTitle" Text="Cáp USB (Độ trễ thấp nhất)" FontSize="13" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                                            <TextBlock x:Name="TxtUsbStatus" Text="Đang kiểm tra ADB..." FontSize="11.5" Foreground="#94A3B8" Margin="0,4,0,10" TextWrapping="Wrap"/>
+                                            <TextBlock x:Name="TxtUsbStatus" Text="Đang kiểm tra ADB..." FontSize="11.5" Foreground="#94A3B8" Margin="0,4,0,8" TextWrapping="Wrap"/>
+                                            <Border Background="#FFFFFF" CornerRadius="6" Padding="6" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                                <Image x:Name="ImgUsbQrCode" Width="96" Height="96" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                            </Border>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
