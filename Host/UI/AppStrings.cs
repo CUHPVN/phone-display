@@ -56,6 +56,8 @@ public static class AppStrings
         (AppLanguage.En, "SectionConnect") => "CONNECT ON ANDROID",
         (AppLanguage.Vi, "UsbTitle") => "1. Cáp USB (Độ trễ thấp nhất)",
         (AppLanguage.En, "UsbTitle") => "1. USB Cable (Lowest Latency)",
+        (AppLanguage.Vi, "UsbTetheringReady") => "USB Tethering sẵn sàng (Không cần bật Nhà phát triển)",
+        (AppLanguage.En, "UsbTetheringReady") => "USB Tethering Ready (No Developer Options needed)",
         (AppLanguage.Vi, "WifiTitle") => "2. Wi-Fi LAN (Quét QR bằng Chrome)",
         (AppLanguage.En, "WifiTitle") => "2. Wi-Fi LAN (Scan QR with Chrome)",
         (AppLanguage.Vi, "WifiHint") => "Lần đầu qua Wi-Fi: bấm Nâng cao → Tiếp tục truy cập",

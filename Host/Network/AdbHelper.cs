@@ -57,6 +57,7 @@ public sealed class AdbHelper : IDisposable
 
         AdbAvailable = true;
         var activeSerials = new List<string>();
+        bool hasUnauthorized = false;
         foreach (string rawLine in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             string line = rawLine.Trim();
@@ -64,9 +65,12 @@ public sealed class AdbHelper : IDisposable
                 continue;
 
             string[] parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2 && parts[1] == "device")
+            if (parts.Length >= 2)
             {
-                activeSerials.Add(parts[0]);
+                if (parts[1] == "device")
+                    activeSerials.Add(parts[0]);
+                else if (parts[1] == "unauthorized")
+                    hasUnauthorized = true;
             }
         }
 
@@ -75,7 +79,9 @@ public sealed class AdbHelper : IDisposable
 
         if (activeSerials.Count == 0)
         {
-            StatusSummary = "Waiting for USB device";
+            StatusSummary = hasUnauthorized
+                ? "Chưa bấm Cho phép (Allow USB Debugging) trên ĐT!"
+                : "Waiting for USB device";
             return;
         }
 

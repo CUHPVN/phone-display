@@ -53,6 +53,8 @@ public partial class MainWindow : Window
     private int _currentTargetFps = 60;
     private int _currentBitrateKbps = 12000;
     private double _measuredFps;
+    private string _lastIpSignature = string.Empty;
+    private int _networkCheckTicks;
 
     public MainWindow()
     {
@@ -197,13 +199,18 @@ public partial class MainWindow : Window
     private void InitializeNetworkPreview()
     {
         var lanIps = SelfSignedCertGenerator.GetLocalIPv4Addresses();
+        _lastIpSignature = string.Join(",", lanIps.Select(ip => ip.ToString()).OrderBy(s => s));
+        _lanCert?.Dispose();
         _lanCert = SelfSignedCertGenerator.LoadOrCreateCertificate(lanIps);
 
         string lanUrl = lanIps.Count > 0
             ? $"https://{lanIps[0]}:{_httpsPort}"
             : $"https://127.0.0.1:{_httpsPort}";
 
-        TxtUsbUrl.Text = $"http://localhost:{_httpPort}";
+        var usbIp = SelfSignedCertGenerator.GetUsbTetheringIPv4Address();
+        TxtUsbUrl.Text = usbIp is not null
+            ? $"https://{usbIp}:{_httpsPort}"
+            : $"http://localhost:{_httpPort}";
         TxtLanUrl.Text = lanUrl;
         ImgQrCode.Source = GenerateQrBitmap(lanUrl);
     }
@@ -497,9 +504,28 @@ public partial class MainWindow : Window
 
     private void UiTimer_Tick(object? sender, EventArgs e)
     {
-        if (_adbHelper is not null)
+        _networkCheckTicks++;
+        var usbIp = SelfSignedCertGenerator.GetUsbTetheringIPv4Address();
+        if (usbIp is not null)
         {
-            TxtUsbStatus.Text = _adbHelper.StatusSummary;
+            TxtUsbStatus.Text = AppStrings.Get(_lang, "UsbTetheringReady");
+            TxtUsbUrl.Text = $"https://{usbIp}:{_httpsPort}";
+        }
+        else
+        {
+            TxtUsbUrl.Text = $"http://localhost:{_httpPort}";
+            if (_adbHelper is not null)
+                TxtUsbStatus.Text = _adbHelper.StatusSummary;
+        }
+
+        if (!_isStreaming && _networkCheckTicks % 8 == 0)
+        {
+            var lanIps = SelfSignedCertGenerator.GetLocalIPv4Addresses();
+            string sig = string.Join(",", lanIps.Select(ip => ip.ToString()).OrderBy(s => s));
+            if (sig != _lastIpSignature)
+            {
+                InitializeNetworkPreview();
+            }
         }
 
         if (_isStreaming && _encoder is not null && _server is not null)

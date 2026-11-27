@@ -65,6 +65,36 @@ public static class SelfSignedCertGenerator
             .ToList();
     }
 
+    public static IPAddress? GetUsbTetheringIPv4Address()
+    {
+        foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (ni.OperationalStatus != OperationalStatus.Up)
+                continue;
+            if (ni.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
+                continue;
+
+            string nameDesc = $"{ni.Name} {ni.Description}".ToLowerInvariant();
+            bool isUsbNet = nameDesc.Contains("rndis") ||
+                            nameDesc.Contains("remote ndis") ||
+                            nameDesc.Contains("usb") ||
+                            nameDesc.Contains("tethering") ||
+                            nameDesc.Contains("android");
+
+            foreach (var unicast in ni.GetIPProperties().UnicastAddresses)
+            {
+                if (unicast.Address.AddressFamily != AddressFamily.InterNetwork ||
+                    IPAddress.IsLoopback(unicast.Address))
+                    continue;
+
+                byte[] b = unicast.Address.GetAddressBytes();
+                if (isUsbNet || (b[0] == 192 && b[1] == 168 && b[2] == 42))
+                    return unicast.Address;
+            }
+        }
+        return null;
+    }
+
     public static X509Certificate2 LoadOrCreateCertificate(IReadOnlyCollection<IPAddress> lanIps)
     {
         string dir = Path.Combine(
