@@ -59,9 +59,10 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
    dotnet publish Host\PhoneDisplay.Host.csproj -c Release -o App
    ```
 2. Double-click `App\PhoneDisplay.exe`, pick your extended monitor, and click **Bắt đầu phát (Start)**.
-3. On Android **Chrome**:
-   - **USB Cable**: Enable *USB Debugging*, wait for `USB Ready`, and open `http://localhost:8080`.
-   - **Wi-Fi LAN**: Scan the QR code (`https://<PC-LAN-IP>:8443`), tap *Advanced -> Proceed* on first visit, then tap **Start Extended Display**.
+3. On Android **Chrome** (or **iOS 16.4+ Safari**):
+   - **USB Cable**: Enable *USB Debugging*, wait for `USB Ready`, and open `http://localhost:8080/?token=<PIN>` (or use **USB Tethering** without Developer Options).
+   - **Wi-Fi LAN**: Scan the QR code (`https://<PC-LAN-IP>:8443/?token=<PIN>`), tap *Advanced -> Proceed* on first visit, then tap **Start Extended Display**.
+   - **iOS (iPhone/iPad 16.4+)**: Supported over Wi-Fi Safari (trust the self-signed HTTPS warning via *Show Details -> Visit this website*, rotate manually to landscape, or *Add to Home Screen* for a cleaner view). USB `adb` is Android-only; iOS USB requires Personal Hotspot over USB with Apple Mobile Device drivers.
 
 ---
 
@@ -102,9 +103,10 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
    dotnet publish Host\PhoneDisplay.Host.csproj -c Release -o App
    ```
 2. Mở `App\PhoneDisplay.exe`, chọn màn hình phụ mở rộng (ví dụ `\\.\DISPLAY2`) và bấm **Bắt đầu phát (Start)**.
-3. Trên **Chrome Android**:
-   - **Qua cáp USB**: Cắm cáp vào PC, đợi mục *Cáp USB* báo `USB Ready`, mở `http://localhost:8080`.
-   - **Qua Wi-Fi LAN**: Quét mã QR trên app (`https://<IP-PC>:8443`), lần đầu bấm **Nâng cao → Tiếp tục truy cập**, rồi bấm **Start Extended Display**.
+3. Trên **Chrome Android** (hoặc **Safari iOS 16.4+**):
+   - **Qua cáp USB**: Cắm cáp vào PC, đợi mục *Cáp USB* báo `USB Ready`, mở `http://localhost:8080/?token=<PIN>` (hoặc bật **USB Tethering** nếu không muốn bật Nhà phát triển).
+   - **Qua Wi-Fi LAN**: Quét mã QR trên app (`https://<IP-PC>:8443/?token=<PIN>`), lần đầu bấm **Nâng cao → Tiếp tục truy cập**, rồi bấm **Start Extended Display**.
+   - **iOS (iPhone/iPad 16.4+)**: Hỗ trợ qua Wi-Fi Safari (bấm *Hiển thị chi tiết → Truy cập trang web này*, xoay ngang thủ công hoặc *Thêm vào Màn hình chính* để ẩn thanh địa chỉ; nếu Safari chặn `wss://` tự ký cần tin cậy chứng chỉ trong Cài đặt). Cáp USB `adb` chỉ dành cho Android; iPhone dùng USB cần Personal Hotspot qua USB có driver Apple/iTunes.
 
 ### Khắc phục sự cố (Troubleshooting)
 - **Không vào được `https://<IP-PC>:8443` qua Wi-Fi**: Kiểm tra 2 thiết bị có dùng chung Wi-Fi không, đổi mạng Windows sang **Private**, và chạy `.\Scripts\setup-virtual-display.ps1 -AddFirewallRules` bằng quyền Admin để mở cổng `8080` và `8443`.
@@ -149,9 +151,10 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
    dotnet publish Host\PhoneDisplay.Host.csproj -c Release -o App
    ```
 2. `App\PhoneDisplay.exe` を起動し、拡張モニターを選択して **Bắt đầu phát (Start)** をクリック。
-3. Android の **Chrome** で接続：
-   - **USB**: `USB Ready` 表示後、`http://localhost:8080` を開く。
-   - **Wi-Fi**: QR コードを読み取るか `https://<PC-LAN-IP>:8443` を開き、初回のみ「詳細設定 → アクセスする」を選択後、**Start Extended Display** をタップ。
+3. Android の **Chrome**（または **iOS 16.4+ Safari**）で接続：
+   - **USB**: `USB Ready` 表示後、`http://localhost:8080/?token=<PIN>` を開く（開発者向けオプションなしの場合は **USB テザリング** を利用）。
+   - **Wi-Fi**: QR コードを読み取るか `https://<PC-LAN-IP>:8443/?token=<PIN>` を開き、初回のみ「詳細設定 → アクセスする」を選択後、**Start Extended Display** をタップ。
+   - **iOS (iPhone/iPad 16.4+)**: Wi-Fi 経由の Safari に対応（自己署名証明書の警告で「詳細を表示 → このWebサイトを閲覧」を選択し、手動で横画面に回転または「ホーム画面に追加」推奨）。USB `adb` は Android 専用です。
 
 ---
 
@@ -192,7 +195,8 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
    dotnet publish Host\PhoneDisplay.Host.csproj -c Release -o App
    ```
 2. 双击运行 `App\PhoneDisplay.exe`，选择扩展显示器后点击 **Bắt đầu phát (Start)**。
-3. 在手机 **Chrome** 中连接：
-   - **USB 连接**: 等待界面显示 `USB Ready` 后访问 `http://localhost:8080`。
-   - **Wi-Fi 连接**: 扫描界面二维码（`https://<PC-LAN-IP>:8443`），首次访问点击“高级 → 继续前往”，然后点击 **Start Extended Display**。
+3. 在手机 **Chrome**（或 **iOS 16.4+ Safari**）中连接：
+   - **USB 连接**: 等待界面显示 `USB Ready` 后访问 `http://localhost:8080/?token=<PIN>`（若不想开启开发者选项，可直接开启 **USB 网络共享**）。
+   - **Wi-Fi 连接**: 扫描界面二维码（`https://<PC-LAN-IP>:8443/?token=<PIN>`），首次访问点击“高级 → 继续前往”，然后点击 **Start Extended Display**。
+   - **iOS (iPhone/iPad 16.4+)**: 支持通过 Wi-Fi Safari 访问（首次需点击“显示详细信息 → 访问此网站”，建议手动横屏或“添加到主屏幕”以隐藏地址栏）。USB `adb` 仅支持 Android。
 
