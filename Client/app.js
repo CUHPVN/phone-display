@@ -410,10 +410,10 @@
     const cy = (clientY - rect.top) * scaleY;
 
     const nx = (cx - drawRect.x) / Math.max(1, drawRect.w);
-    const ny = (cy - drawRect.y) / Math.max(1, rect.h);
+    const ny = (cy - drawRect.y) / Math.max(1, drawRect.h);
     return {
-      x: Math.min(1, Math.max(0, nx)),
-      y: Math.min(1, Math.max(0, ny))
+      x: Number.isFinite(nx) ? Math.min(1, Math.max(0, nx)) : 0,
+      y: Number.isFinite(ny) ? Math.min(1, Math.max(0, ny)) : 0
     };
   }
 
