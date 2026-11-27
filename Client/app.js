@@ -68,6 +68,7 @@
   let decoder = null;
   let wakeLock = null;
   let isRunning = false;
+  let hasConnectedOnce = false;
   let waitingForKeyframe = true;
   let reconnectTimer = null;
   let pingTimer = null;
@@ -260,6 +261,7 @@
     ws.binaryType = "arraybuffer";
 
     ws.onopen = async () => {
+      hasConnectedOnce = true;
       showToast("Connected", 1200);
       await initDecoder();
 
@@ -290,11 +292,15 @@
       handleVideoPacket(ev.data);
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       clearInterval(pingTimer);
       closeDecoder();
       if (isRunning) {
-        showToast("Reconnecting...", 0);
+        if (ev.code === 1006 && !hasConnectedOnce) {
+          showToast("Connection rejected — check PIN / ?token= or Firewall", 3500);
+        } else {
+          showToast("Reconnecting...", 0);
+        }
         reconnectTimer = setTimeout(connectWebSocket, 1200);
       }
     };
@@ -445,7 +451,12 @@
     // Mouse / Laptop Touchpad on PC browsers
     if (e.pointerType === "mouse") {
       if (inputMode === "trackpad") {
-        // In Trackpad mode on PC, left-drag moves cursor relatively, click = leftclick, right = rightclick
+        // If Pointer Lock is active, mouse clicks act directly as left/right clicks
+        if (document.pointerLockElement === canvas) {
+          if (e.button === 2) sendControl({ type: "input", action: "trackpad_rightclick" });
+          else if (e.button === 0) sendControl({ type: "input", action: "leftdown" });
+          return;
+        }
         if (e.button === 2) {
           sendControl({ type: "input", action: "trackpad_rightclick" });
         } else if (e.button === 0) {
@@ -544,6 +555,18 @@
       lastMoveSentAt = now;
 
       if (inputMode === "trackpad") {
+        if (document.pointerLockElement === canvas) {
+          trackpadSubPixelX += (e.movementX || 0) * 1.4;
+          trackpadSubPixelY += (e.movementY || 0) * 1.4;
+          const sendDx = Math.trunc(trackpadSubPixelX);
+          const sendDy = Math.trunc(trackpadSubPixelY);
+          if (sendDx !== 0 || sendDy !== 0) {
+            trackpadSubPixelX -= sendDx;
+            trackpadSubPixelY -= sendDy;
+            sendControl({ type: "input", action: "trackpad_move", dx: sendDx, dy: sendDy });
+          }
+          return;
+        }
         if (!activePointers.has(e.pointerId)) return;
         const dx = e.clientX - gestureState.lastX;
         const dy = e.clientY - gestureState.lastY;
@@ -633,6 +656,10 @@
 
   function handlePointerEnd(e) {
     if (e.pointerType === "mouse") {
+      if (inputMode === "trackpad" && document.pointerLockElement === canvas) {
+        if (e.button === 0) sendControl({ type: "input", action: "leftup" });
+        return;
+      }
       if (activePointers.has(e.pointerId)) {
         activePointers.delete(e.pointerId);
         if (inputMode === "trackpad") {
