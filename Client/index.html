@@ -72,14 +72,14 @@
       </div>
     </div>
 
-    <!-- Hidden input for triggering mobile soft keyboard -->
+    <!-- Hidden input for triggering mobile soft keyboard (kept inside viewport for Android/iOS compatibility) -->
     <input id="mobile-kbd-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-           style="position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;" />
+           style="position:fixed;left:50%;bottom:12px;width:2px;height:2px;opacity:0.01;border:0;padding:0;margin:0;pointer-events:none;z-index:-1;" />
 
     <!-- Connection Toast -->
     <div id="toast" class="toast hidden">Connecting...</div>
   </div>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

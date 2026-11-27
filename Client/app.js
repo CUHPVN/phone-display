@@ -792,41 +792,81 @@
 
   // --- Keyboard Support (PC physical keyboard + Mobile soft keyboard button) ---
   let isComposing = false;
+  const KBD_SENTINEL = " ";
+
+  function resetMobileKbdInput() {
+    mobileKbdInput.value = KBD_SENTINEL;
+    try { mobileKbdInput.setSelectionRange(1, 1); } catch { /* ignore */ }
+  }
+
+  function sendKeyTap(key, code) {
+    sendControl({ type: "input", action: "keydown", key, code });
+    sendControl({ type: "input", action: "keyup", key, code });
+  }
 
   btnKeyboard.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (document.activeElement === mobileKbdInput) {
+      mobileKbdInput.blur();
+      btnKeyboard.classList.remove("active");
+      return;
+    }
+
     if (inputMode === "view") {
-      // Auto-switch from View Only to Trackpad when user explicitly opens keyboard
       inputModeIndex = 1;
       inputMode = "trackpad";
       btnMode.textContent = "Trackpad";
       btnMode.classList.add("active");
     }
-    mobileKbdInput.value = "";
-    mobileKbdInput.focus();
+
+    resetMobileKbdInput();
+    mobileKbdInput.focus({ preventScroll: true });
+    btnKeyboard.classList.add("active");
+  });
+
+  mobileKbdInput.addEventListener("blur", () => {
+    btnKeyboard.classList.remove("active");
   });
 
   mobileKbdInput.addEventListener("compositionstart", () => {
     isComposing = true;
   });
 
-  mobileKbdInput.addEventListener("compositionend", (e) => {
+  mobileKbdInput.addEventListener("compositionend", () => {
     isComposing = false;
-    const text = e.data || mobileKbdInput.value;
-    if (text) {
-      sendControl({ type: "input", action: "text", text });
-    }
-    mobileKbdInput.value = "";
+    handleMobileInputDiff();
   });
 
-  mobileKbdInput.addEventListener("input", () => {
-    if (isComposing) return;
-    const text = mobileKbdInput.value;
-    if (text) {
-      sendControl({ type: "input", action: "text", text });
-      mobileKbdInput.value = "";
+  mobileKbdInput.addEventListener("input", (e) => {
+    if (e.inputType === "deleteContentBackward") {
+      sendKeyTap("Backspace", "Backspace");
+      resetMobileKbdInput();
+      return;
     }
+    if (e.inputType === "insertLineBreak") {
+      sendKeyTap("Enter", "Enter");
+      resetMobileKbdInput();
+      return;
+    }
+    if (isComposing) return;
+    handleMobileInputDiff();
   });
+
+  function handleMobileInputDiff() {
+    const val = mobileKbdInput.value;
+    if (val.length === 0) {
+      sendKeyTap("Backspace", "Backspace");
+      resetMobileKbdInput();
+      return;
+    }
+    if (val.startsWith(KBD_SENTINEL)) {
+      const typed = val.slice(KBD_SENTINEL.length);
+      if (typed) sendControl({ type: "input", action: "text", text: typed });
+    } else {
+      sendControl({ type: "input", action: "text", text: val });
+    }
+    resetMobileKbdInput();
+  }
 
   mobileKbdInput.addEventListener("keydown", (e) => {
     if (!isRunning) return;
