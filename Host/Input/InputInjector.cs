@@ -142,7 +142,11 @@ public sealed class InputInjector
             }
         };
 
-        SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
+        uint sent = SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
+        if (sent == 0)
+        {
+            SetCursorPos(pixelX, pixelY);
+        }
     }
 
     private static void MoveRelative(int dx, int dy)
@@ -216,6 +220,9 @@ public sealed class InputInjector
     private const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
     private const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;
     private const int WHEEL_DELTA = 120;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetCursorPos(int X, int Y);
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);

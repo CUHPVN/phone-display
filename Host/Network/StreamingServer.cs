@@ -66,7 +66,12 @@ public sealed class StreamingServer : IAsyncDisposable
         _app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = fileProvider,
-            ServeUnknownFileTypes = true
+            ServeUnknownFileTypes = true,
+            OnPrepareResponse = ctx =>
+            {
+                ctx.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+                ctx.Context.Response.Headers.Pragma = "no-cache";
+            }
         });
 
         _app.Map("/ws", HandleWebSocketAsync);
