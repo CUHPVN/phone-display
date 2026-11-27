@@ -141,7 +141,7 @@ public static class SelfSignedCertGenerator
                 string savedSig = File.ReadAllText(metaPath).Trim();
                 if (savedSig == ipSignature)
                 {
-                    var existing = new X509Certificate2(pfxPath, string.Empty, X509KeyStorageFlags.Exportable);
+                    var existing = X509CertificateLoader.LoadPkcs12FromFile(pfxPath, string.Empty, X509KeyStorageFlags.Exportable);
                     if (existing.NotAfter > DateTime.UtcNow.AddDays(7))
                         return existing;
                     existing.Dispose();
@@ -184,6 +184,6 @@ public static class SelfSignedCertGenerator
         File.WriteAllBytes(pfxPath, pfxBytes);
         File.WriteAllText(metaPath, ipSignature);
 
-        return new X509Certificate2(pfxBytes, string.Empty, X509KeyStorageFlags.Exportable);
+        return X509CertificateLoader.LoadPkcs12(pfxBytes, string.Empty, X509KeyStorageFlags.Exportable);
     }
 }
