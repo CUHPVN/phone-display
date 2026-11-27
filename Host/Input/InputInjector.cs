@@ -34,6 +34,9 @@ public sealed class InputInjector
         if (string.IsNullOrEmpty(msg.Action))
             return;
 
+        nint prevDpiCtx = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        try
+        {
         lock (_lock)
         {
             switch (msg.Action)
@@ -108,6 +111,12 @@ public sealed class InputInjector
                     }
                     break;
             }
+        }
+        }
+        finally
+        {
+            if (prevDpiCtx != nint.Zero)
+                SetThreadDpiAwarenessContext(prevDpiCtx);
         }
     }
 
@@ -193,6 +202,11 @@ public sealed class InputInjector
     private const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
     private const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;
     private const int WHEEL_DELTA = 120;
+
+    private static readonly nint DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new(-4);
+
+    [DllImport("user32.dll")]
+    private static extern nint SetThreadDpiAwarenessContext(nint dpiContext);
 
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int X, int Y);
