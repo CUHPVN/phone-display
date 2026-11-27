@@ -434,6 +434,24 @@
   }
 
   let lastMoveSentAt = 0;
+  let isHoveringWebUi = false;
+
+  miniPill.addEventListener("pointerenter", () => {
+    isHoveringWebUi = true;
+    miniPill.classList.add("expanded");
+  });
+  miniPill.addEventListener("pointerleave", () => {
+    isHoveringWebUi = false;
+    resetPillFade();
+  });
+
+  function isOverWebUi(e) {
+    if (isHoveringWebUi) return true;
+    if (e.target !== canvas) return true;
+    const r = miniPill.getBoundingClientRect();
+    return e.clientX >= r.left - 6 && e.clientX <= r.right + 6 &&
+           e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6;
+  }
 
   canvas.addEventListener("contextmenu", (e) => {
     if (isRunning) e.preventDefault();
@@ -454,7 +472,7 @@
   }, { passive: false });
 
   canvas.addEventListener("pointerdown", (e) => {
-    if (!isRunning || inputMode === "view") return;
+    if (!isRunning || inputMode === "view" || isOverWebUi(e)) return;
     e.preventDefault();
 
     try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -562,6 +580,7 @@
 
   canvas.addEventListener("pointermove", (e) => {
     if (!isRunning || inputMode === "view") return;
+    if (e.pointerType === "mouse" && isOverWebUi(e) && !activePointers.has(e.pointerId)) return;
 
     // Mouse / Laptop Touchpad on PC browsers
     if (e.pointerType === "mouse") {
