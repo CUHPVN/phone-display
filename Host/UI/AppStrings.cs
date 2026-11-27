@@ -134,6 +134,55 @@ public static class AppStrings
         (AppLanguage.Vi, "ExtendedTag") => "Mở rộng",
         (AppLanguage.En, "ExtendedTag") => "Extended",
 
+        (AppLanguage.Vi, "Fps60") => "60 FPS (Khuyên dùng)",
+        (AppLanguage.En, "Fps60") => "60 FPS (Recommended)",
+        (AppLanguage.Vi, "Fps90") => "90 FPS",
+        (AppLanguage.En, "Fps90") => "90 FPS",
+        (AppLanguage.Vi, "Fps120") => "120 FPS (Cáp USB)",
+        (AppLanguage.En, "Fps120") => "120 FPS (USB Cable)",
+
+        (AppLanguage.Vi, "Br8") => "8 Mbps (Nhẹ)",
+        (AppLanguage.En, "Br8") => "8 Mbps (Light)",
+        (AppLanguage.Vi, "Br12") => "12 Mbps (Cân bằng)",
+        (AppLanguage.En, "Br12") => "12 Mbps (Balanced)",
+        (AppLanguage.Vi, "Br20") => "20 Mbps (Nét)",
+        (AppLanguage.En, "Br20") => "20 Mbps (Sharp)",
+        (AppLanguage.Vi, "Br30") => "30 Mbps (Tối đa)",
+        (AppLanguage.En, "Br30") => "30 Mbps (Max)",
+
+        (AppLanguage.Vi, "EncAuto") => "Tự động (NVENC RTX → x264)",
+        (AppLanguage.En, "EncAuto") => "Auto (NVENC RTX → x264)",
+        (AppLanguage.Vi, "EncNvenc") => "NVIDIA NVENC (Phần cứng RTX)",
+        (AppLanguage.En, "EncNvenc") => "NVIDIA NVENC (RTX Hardware)",
+        (AppLanguage.Vi, "EncX264") => "CPU libx264",
+        (AppLanguage.En, "EncX264") => "CPU libx264",
+
+        (AppLanguage.Vi, "BtnSwitchLang") => "Chuyển sang English (EN)",
+        (AppLanguage.En, "BtnSwitchLang") => "Switch to Tiếng Việt (VI)",
+
+        (AppLanguage.Vi, "TipTray") => "Ẩn xuống khay hệ thống (System Tray)",
+        (AppLanguage.En, "TipTray") => "Hide to System Tray",
+        (AppLanguage.Vi, "TipMin") => "Thu nhỏ",
+        (AppLanguage.En, "TipMin") => "Minimize",
+        (AppLanguage.Vi, "TipClose") => "Đóng (Alt+F4)",
+        (AppLanguage.En, "TipClose") => "Close (Alt+F4)",
+
+        (AppLanguage.Vi, "StatusRow1") => "DXGI + NVENC H.264 Stream, USB ADB / Tethering, Wi-Fi Android Chrome, View Only / Trackpad / Touch, Bàn phím PC & Mobile",
+        (AppLanguage.En, "StatusRow1") => "DXGI + NVENC H.264 Stream, USB ADB / Tethering, Wi-Fi Android Chrome, View Only / Trackpad / Touch, PC & Mobile Keyboard",
+        (AppLanguage.Vi, "StatusRow2") => "Tự khớp độ phân giải màn hình phụ: Phụ thuộc danh sách mode của Virtual Display Driver (VDD); nếu không có tỉ lệ khớp có thể chọn độ phân giải khác.",
+        (AppLanguage.En, "StatusRow2") => "Auto-match display resolution: Depends on Virtual Display Driver (VDD) modes; if no exact aspect ratio exists, Windows selects the closest mode.",
+        (AppLanguage.Vi, "StatusRow3") => "PC ↔ PC qua Radmin VPN: Cần bấm Mở Firewall (8080/8443) trên máy Host; độ mượt phụ thuộc đường truyền VPN.",
+        (AppLanguage.En, "StatusRow3") => "PC ↔ PC via Radmin VPN: Requires opening Firewall ports (8080/8443) on Host; smoothness depends on VPN bandwidth.",
+        (AppLanguage.Vi, "StatusRow4") => "iOS Safari (16.4+): Cần chấp nhận chứng chỉ HTTPS tự ký thủ công; không hỗ trợ tự Fullscreen / khóa xoay ngang hoặc ADB USB như Android.",
+        (AppLanguage.En, "StatusRow4") => "iOS Safari (16.4+): Requires manually trusting self-signed HTTPS cert; no auto-Fullscreen / orientation lock or ADB USB like Android.",
+
+        (AppLanguage.Vi, "ErrNoMonitor") => "Không tìm thấy màn hình nào để chia sẻ.",
+        (AppLanguage.En, "ErrNoMonitor") => "No display found to stream.",
+        (AppLanguage.Vi, "ErrNoClientDir") => "Không tìm thấy thư mục web Client tại",
+        (AppLanguage.En, "ErrNoClientDir") => "Client web directory not found at",
+        (AppLanguage.Vi, "ErrStartFailed") => "Không thể khởi chạy",
+        (AppLanguage.En, "ErrStartFailed") => "Failed to start streaming",
+
         _ => key
     };
 }

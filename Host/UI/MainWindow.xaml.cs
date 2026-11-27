@@ -210,6 +210,9 @@ public partial class MainWindow : Window
         TxtLangCode.Text = _lang == AppLanguage.Vi ? "VI" : "EN";
         TxtTitleTag.Text = S("TitleTag");
         TxtHideToTray.Text = S("HideTray");
+        BtnHideToTray.ToolTip = S("TipTray");
+        BtnMinimize.ToolTip = S("TipMin");
+        BtnClose.ToolTip = S("TipClose");
 
         TxtNavStream.Text = S("NavStream");
         TxtNavConnect.Text = S("NavConnect");
@@ -224,6 +227,17 @@ public partial class MainWindow : Window
         TxtBitrateLabel.Text = S("BitrateLabel");
         TxtEncoderLabel.Text = S("EncoderLabel");
 
+        CmbFps60.Content = S("Fps60");
+        CmbFps90.Content = S("Fps90");
+        CmbFps120.Content = S("Fps120");
+        CmbBr8.Content = S("Br8");
+        CmbBr12.Content = S("Br12");
+        CmbBr20.Content = S("Br20");
+        CmbBr30.Content = S("Br30");
+        CmbEncAuto.Content = S("EncAuto");
+        CmbEncNvenc.Content = S("EncNvenc");
+        CmbEncX264.Content = S("EncX264");
+
         TxtConnectTitle.Text = S("ConnectTitle");
         TxtConnectSub.Text = S("ConnectSub");
         BtnRotatePin.Content = S("RotatePin");
@@ -231,6 +245,8 @@ public partial class MainWindow : Window
         TxtWifiTitle.Text = S("WifiTitle");
         TxtWifiHint.Text = S("WifiHint");
         TxtRadminTitle.Text = S("RadminTitle");
+        if (PanelRadmin.Visibility != Visibility.Visible)
+            TxtRadminHint.Text = S("RadminNone");
 
         TxtSettingsTitle.Text = S("SettingsTitle");
         TxtSettingsSub.Text = S("SettingsSub");
@@ -241,9 +257,14 @@ public partial class MainWindow : Window
         ChkAutoRes.Content = S("AutoRes");
         ChkMinimizeToTrayOnClose.Content = S("MinimizeToTray");
         TxtLangSection.Text = S("LangSection");
+        BtnSettingsLang.Content = S("BtnSwitchLang");
 
         TxtStatusTitle.Text = S("StatusTitle");
         TxtStatusSub.Text = S("StatusSub");
+        TxtStatusRow1.Text = S("StatusRow1");
+        TxtStatusRow2.Text = S("StatusRow2");
+        TxtStatusRow3.Text = S("StatusRow3");
+        TxtStatusRow4.Text = S("StatusRow4");
         TxtStatClientsLabel.Text = S("StatClientsLabel");
 
         if (_trayOpenItem is not null) _trayOpenItem.Text = S("TrayOpen");
@@ -407,14 +428,14 @@ public partial class MainWindow : Window
 
         if (CmbMonitor.SelectedItem is not ComboBoxItem monItem || monItem.Tag is not MonitorInfo selectedMonitor)
         {
-            ShowError("Không tìm thấy màn hình nào để chia sẻ.");
+            ShowError(AppStrings.Get(_lang, "ErrNoMonitor"));
             return;
         }
 
         string clientPath = ResolveClientDirectory();
         if (!Directory.Exists(clientPath))
         {
-            ShowError($"Không tìm thấy thư mục web Client tại: {clientPath}");
+            ShowError($"{AppStrings.Get(_lang, "ErrNoClientDir")}: {clientPath}");
             return;
         }
 
@@ -531,7 +552,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError($"Không thể khởi chạy: {ex.Message}");
+            ShowError($"{AppStrings.Get(_lang, "ErrStartFailed")}: {ex.Message}");
             await StopStreamingAsync();
         }
     }

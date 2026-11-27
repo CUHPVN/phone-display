@@ -269,10 +269,10 @@
                                 ToolTip="Ẩn xuống khay hệ thống (System Tray)" Click="BtnHideToTray_Click" Margin="0,0,2,0">
                             <TextBlock x:Name="TxtHideToTray" Text="Khay" FontSize="11.5" FontWeight="Medium"/>
                         </Button>
-                        <Button Style="{StaticResource TitleBarButton}" ToolTip="Thu nhỏ" Click="BtnMinimize_Click">
+                        <Button x:Name="BtnMinimize" Style="{StaticResource TitleBarButton}" ToolTip="Thu nhỏ" Click="BtnMinimize_Click">
                             <Path Data="M2,7 H10" Stroke="#CBD5E1" StrokeThickness="1.5" Width="12" Height="12"/>
                         </Button>
-                        <Button Style="{StaticResource TitleBarButton}" ToolTip="Đóng (Alt+F4)" Click="BtnClose_Click">
+                        <Button x:Name="BtnClose" Style="{StaticResource TitleBarButton}" ToolTip="Đóng (Alt+F4)" Click="BtnClose_Click">
                             <Path Data="M2,2 L10,10 M10,2 L2,10" Stroke="#CBD5E1" StrokeThickness="1.5" Width="12" Height="12"/>
                         </Button>
                     </StackPanel>
@@ -367,27 +367,27 @@
                                         <StackPanel Grid.Column="0">
                                             <TextBlock x:Name="TxtFpsLabel" Text="Tần số quét (FPS)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
                                             <ComboBox x:Name="CmbFps">
-                                                <ComboBoxItem Content="60 FPS (Khuyên dùng)" Tag="60" IsSelected="True"/>
-                                                <ComboBoxItem Content="90 FPS" Tag="90"/>
-                                                <ComboBoxItem Content="120 FPS (Cáp USB)" Tag="120"/>
+                                                <ComboBoxItem x:Name="CmbFps60" Content="60 FPS (Khuyên dùng)" Tag="60" IsSelected="True"/>
+                                                <ComboBoxItem x:Name="CmbFps90" Content="90 FPS" Tag="90"/>
+                                                <ComboBoxItem x:Name="CmbFps120" Content="120 FPS (Cáp USB)" Tag="120"/>
                                             </ComboBox>
                                         </StackPanel>
                                         <StackPanel Grid.Column="2">
                                             <TextBlock x:Name="TxtBitrateLabel" Text="Chất lượng (Bitrate)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
                                             <ComboBox x:Name="CmbBitrate">
-                                                <ComboBoxItem Content="8 Mbps (Nhẹ)" Tag="8000"/>
-                                                <ComboBoxItem Content="12 Mbps (Cân bằng)" Tag="12000" IsSelected="True"/>
-                                                <ComboBoxItem Content="20 Mbps (Nét)" Tag="20000"/>
-                                                <ComboBoxItem Content="30 Mbps (Tối đa)" Tag="30000"/>
+                                                <ComboBoxItem x:Name="CmbBr8" Content="8 Mbps (Nhẹ)" Tag="8000"/>
+                                                <ComboBoxItem x:Name="CmbBr12" Content="12 Mbps (Cân bằng)" Tag="12000" IsSelected="True"/>
+                                                <ComboBoxItem x:Name="CmbBr20" Content="20 Mbps (Nét)" Tag="20000"/>
+                                                <ComboBoxItem x:Name="CmbBr30" Content="30 Mbps (Tối đa)" Tag="30000"/>
                                             </ComboBox>
                                         </StackPanel>
                                     </Grid>
 
                                     <TextBlock x:Name="TxtEncoderLabel" Text="Bộ mã hóa Video (Encoder)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
                                     <ComboBox x:Name="CmbEncoder" Margin="0,0,0,16">
-                                        <ComboBoxItem Content="Tự động (NVENC RTX → x264)" Tag="auto" IsSelected="True"/>
-                                        <ComboBoxItem Content="NVIDIA NVENC (Phần cứng RTX)" Tag="nvenc"/>
-                                        <ComboBoxItem Content="CPU libx264" Tag="x264"/>
+                                        <ComboBoxItem x:Name="CmbEncAuto" Content="Tự động (NVENC RTX → x264)" Tag="auto" IsSelected="True"/>
+                                        <ComboBoxItem x:Name="CmbEncNvenc" Content="NVIDIA NVENC (Phần cứng RTX)" Tag="nvenc"/>
+                                        <ComboBoxItem x:Name="CmbEncX264" Content="CPU libx264" Tag="x264"/>
                                     </ComboBox>
 
                                     <TextBlock x:Name="TxtErrorBanner" Text="" Foreground="#F87171" FontSize="12"
@@ -587,7 +587,7 @@
                                         <Border Background="#14261C" BorderBrush="#1E462E" BorderThickness="1" CornerRadius="4" Padding="8,3">
                                             <TextBlock Text="STABLE" FontSize="10" FontWeight="Bold" Foreground="#4ADE80"/>
                                         </Border>
-                                        <TextBlock Grid.Column="2" Text="DXGI + NVENC H.264 Stream, USB ADB / Tethering, Wi-Fi Android Chrome, View Only / Trackpad / Touch, PC &amp; Mobile Keyboard"
+                                        <TextBlock x:Name="TxtStatusRow1" Grid.Column="2" Text="DXGI + NVENC H.264 Stream, USB ADB / Tethering, Wi-Fi Android Chrome, View Only / Trackpad / Touch, PC &amp; Mobile Keyboard"
                                                    FontSize="12.5" Foreground="#E2E8F0" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                     </Grid>
 
@@ -600,7 +600,7 @@
                                         <Border Background="#2A2010" BorderBrush="#78350F" BorderThickness="1" CornerRadius="4" Padding="8,3">
                                             <TextBlock Text="BETA" FontSize="10" FontWeight="Bold" Foreground="#FBBF24"/>
                                         </Border>
-                                        <TextBlock Grid.Column="2" Text="Tự khớp độ phân giải màn hình phụ: Phụ thuộc danh sách mode của Virtual Display Driver (VDD); nếu không có tỉ lệ khớp có thể chọn độ phân giải khác."
+                                        <TextBlock x:Name="TxtStatusRow2" Grid.Column="2" Text="Tự khớp độ phân giải màn hình phụ: Phụ thuộc danh sách mode của Virtual Display Driver (VDD); nếu không có tỉ lệ khớp có thể chọn độ phân giải khác."
                                                    FontSize="12.5" Foreground="#CBD5E1" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                     </Grid>
 
@@ -613,7 +613,7 @@
                                         <Border Background="#2A2010" BorderBrush="#78350F" BorderThickness="1" CornerRadius="4" Padding="8,3">
                                             <TextBlock Text="BETA" FontSize="10" FontWeight="Bold" Foreground="#FBBF24"/>
                                         </Border>
-                                        <TextBlock Grid.Column="2" Text="PC ↔ PC qua Radmin VPN: Cần bấm Mở Firewall (8080/8443) trên máy Host; độ mượt phụ thuộc đường truyền VPN."
+                                        <TextBlock x:Name="TxtStatusRow3" Grid.Column="2" Text="PC ↔ PC qua Radmin VPN: Cần bấm Mở Firewall (8080/8443) trên máy Host; độ mượt phụ thuộc đường truyền VPN."
                                                    FontSize="12.5" Foreground="#CBD5E1" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                     </Grid>
 
@@ -626,7 +626,7 @@
                                         <Border Background="#2A2010" BorderBrush="#78350F" BorderThickness="1" CornerRadius="4" Padding="8,3">
                                             <TextBlock Text="BETA" FontSize="10" FontWeight="Bold" Foreground="#FBBF24"/>
                                         </Border>
-                                        <TextBlock Grid.Column="2" Text="iOS Safari (16.4+): Cần chấp nhận chứng chỉ HTTPS tự ký thủ công; không hỗ trợ tự Fullscreen / khóa xoay ngang hoặc ADB USB như Android."
+                                        <TextBlock x:Name="TxtStatusRow4" Grid.Column="2" Text="iOS Safari (16.4+): Cần chấp nhận chứng chỉ HTTPS tự ký thủ công; không hỗ trợ tự Fullscreen / khóa xoay ngang hoặc ADB USB như Android."
                                                    FontSize="12.5" Foreground="#CBD5E1" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                     </Grid>
                                 </StackPanel>
