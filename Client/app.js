@@ -431,6 +431,9 @@
     if (isRunning) e.preventDefault();
   });
 
+  canvas.addEventListener("dragstart", (e) => e.preventDefault());
+  canvas.addEventListener("selectstart", (e) => e.preventDefault());
+
   canvas.addEventListener("wheel", (e) => {
     if (!isRunning || inputMode === "view") return;
     e.preventDefault();

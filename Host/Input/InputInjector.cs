@@ -119,34 +119,7 @@ public sealed class InputInjector
         int pixelX = _monitorLeft + (int)Math.Round(clampedX * (_monitorWidth - 1));
         int pixelY = _monitorTop + (int)Math.Round(clampedY * (_monitorHeight - 1));
 
-        int vLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
-        int vTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
-        int vWidth = Math.Max(1, GetSystemMetrics(SM_CXVIRTUALSCREEN));
-        int vHeight = Math.Max(1, GetSystemMetrics(SM_CYVIRTUALSCREEN));
-
-        // Windows virtual desktop normalized coordinates span [0..65535]
-        int absX = (int)Math.Clamp(Math.Round(((pixelX - vLeft) * 65535.0) / Math.Max(1, vWidth - 1)), 0, 65535);
-        int absY = (int)Math.Clamp(Math.Round(((pixelY - vTop) * 65535.0) / Math.Max(1, vHeight - 1)), 0, 65535);
-
-        var input = new INPUT
-        {
-            type = INPUT_MOUSE,
-            U = new InputUnion
-            {
-                mi = new MOUSEINPUT
-                {
-                    dx = absX,
-                    dy = absY,
-                    dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
-                }
-            }
-        };
-
-        uint sent = SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
-        if (sent == 0)
-        {
-            SetCursorPos(pixelX, pixelY);
-        }
+        SetCursorPos(pixelX, pixelY);
     }
 
     private static void MoveRelative(int dx, int dy)

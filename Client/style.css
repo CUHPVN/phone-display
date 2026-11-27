@@ -34,6 +34,8 @@ body {
   height: 100%;
   touch-action: none;
   background: #000000;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .overlay {
