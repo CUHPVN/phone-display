@@ -397,6 +397,9 @@
     isDraggingLeft: false,
     longPressFired: false,
     longPressTimer: null,
+    rightClickX: 0,
+    rightClickY: 0,
+    secondFingerTapped: false,
     twoFingerLastMidX: 0,
     twoFingerLastMidY: 0,
     twoFingerMoved: false
@@ -542,8 +545,12 @@
         gestureState.isDraggingLeft = false;
       }
       if (inputMode === "touch" && gestureState.mode === "single") {
-        const norm = clientToNormalized(e.clientX, e.clientY);
-        sendControl({ type: "input", action: "up", x: norm.x, y: norm.y });
+        // Release left-button at Finger 1's coordinates and save them for 2nd-finger right-click
+        const firstNorm = clientToNormalized(gestureState.lastX, gestureState.lastY);
+        sendControl({ type: "input", action: "up", x: firstNorm.x, y: firstNorm.y });
+        gestureState.rightClickX = gestureState.lastX;
+        gestureState.rightClickY = gestureState.lastY;
+        gestureState.secondFingerTapped = true;
       }
       gestureState.mode = "scroll";
       gestureState.twoFingerMoved = false;
@@ -702,8 +709,14 @@
           }
         }
       }
-    } else if (gestureState.mode === "scroll" && activePointers.size === 0) {
-      if (!gestureState.twoFingerMoved && inputMode !== "view") {
+    } else if (gestureState.mode === "scroll") {
+      if (inputMode === "touch" && gestureState.secondFingerTapped && !gestureState.twoFingerMoved) {
+        // 2nd finger lifted without scrolling -> Right-click at Finger 1's position immediately
+        const rcNorm = clientToNormalized(gestureState.rightClickX, gestureState.rightClickY);
+        sendControl({ type: "input", action: "rightclick", x: rcNorm.x, y: rcNorm.y });
+        gestureState.secondFingerTapped = false;
+        vibrateShort();
+      } else if (activePointers.size === 0 && !gestureState.twoFingerMoved && inputMode === "trackpad") {
         sendControl({ type: "input", action: "trackpad_rightclick" });
         vibrateShort();
       }
