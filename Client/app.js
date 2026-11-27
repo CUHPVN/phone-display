@@ -25,6 +25,27 @@
   const statRtt = document.getElementById("stat-rtt");
   const statEncName = document.getElementById("stat-enc-name");
 
+  const btnWebLang = document.getElementById("btn-web-lang");
+  const txtWebSubtitle = document.getElementById("txt-web-subtitle");
+  let webLang = navigator.language && navigator.language.toLowerCase().startsWith("vi") ? "vi" : "en";
+
+  function applyWebLang() {
+    if (webLang === "vi") {
+      txtWebSubtitle.textContent = "Biến điện thoại Android thành màn hình phụ Windows 11 giải mã phần cứng, không cần cài app.";
+      btnStart.textContent = "Bắt đầu màn hình phụ";
+      btnWebLang.textContent = "VI";
+    } else {
+      txtWebSubtitle.textContent = "Turn your Android phone into a hardware-decoded extended Windows 11 monitor with zero app installation.";
+      btnStart.textContent = "Start Extended Display";
+      btnWebLang.textContent = "EN";
+    }
+  }
+  applyWebLang();
+  btnWebLang.addEventListener("click", () => {
+    webLang = webLang === "vi" ? "en" : "vi";
+    applyWebLang();
+  });
+
   // Secure context check (WebCodecs requires HTTPS on Wi-Fi or localhost on USB)
   const hasWebCodecs = typeof window.VideoDecoder === "function";
   if (!window.isSecureContext || !hasWebCodecs) {

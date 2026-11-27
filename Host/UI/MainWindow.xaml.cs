@@ -32,10 +32,13 @@ public partial class MainWindow : Window
     private AdbHelper? _adbHelper;
     private X509Certificate2? _lanCert;
 
-    // System Tray
+    // System Tray & Language
     private WinForms.NotifyIcon? _trayIcon;
+    private WinForms.ToolStripMenuItem? _trayOpenItem;
     private WinForms.ToolStripMenuItem? _trayToggleItem;
+    private WinForms.ToolStripMenuItem? _trayExitItem;
     private bool _forceExit;
+    private AppLanguage _lang = AppLanguage.Vi;
 
     // Active streaming state
     private bool _isStreaming;
@@ -64,6 +67,7 @@ public partial class MainWindow : Window
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         InitializeTrayIcon();
+        ApplyLanguage();
         RefreshMonitorList();
         InitializeNetworkPreview();
         _adbHelper = new AdbHelper(_httpPort);
@@ -72,14 +76,14 @@ public partial class MainWindow : Window
     private void InitializeTrayIcon()
     {
         var menu = new WinForms.ContextMenuStrip();
-        var openItem = new WinForms.ToolStripMenuItem("Mở PhoneDisplay", null, (_, _) => Dispatcher.Invoke(RestoreFromTray));
-        _trayToggleItem = new WinForms.ToolStripMenuItem("Bắt đầu phát (Start)", null, async (_, _) => await Dispatcher.InvokeAsync(ToggleStreamFromTrayAsync));
-        var exitItem = new WinForms.ToolStripMenuItem("Thoát hẳn (Exit)", null, (_, _) => Dispatcher.Invoke(ExitApplication));
+        _trayOpenItem = new WinForms.ToolStripMenuItem(AppStrings.Get(_lang, "TrayOpen"), null, (_, _) => Dispatcher.Invoke(RestoreFromTray));
+        _trayToggleItem = new WinForms.ToolStripMenuItem(AppStrings.Get(_lang, "BtnStart"), null, async (_, _) => await Dispatcher.InvokeAsync(ToggleStreamFromTrayAsync));
+        _trayExitItem = new WinForms.ToolStripMenuItem(AppStrings.Get(_lang, "TrayExit"), null, (_, _) => Dispatcher.Invoke(ExitApplication));
 
-        menu.Items.Add(openItem);
+        menu.Items.Add(_trayOpenItem);
         menu.Items.Add(_trayToggleItem);
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add(exitItem);
+        menu.Items.Add(_trayExitItem);
 
         _trayIcon = new WinForms.NotifyIcon
         {
@@ -111,10 +115,58 @@ public partial class MainWindow : Window
         return System.Drawing.Icon.FromHandle(hIcon);
     }
 
+    private void BtnLangToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _lang = _lang == AppLanguage.Vi ? AppLanguage.En : AppLanguage.Vi;
+        ApplyLanguage();
+        RefreshMonitorList();
+    }
+
+    private void ApplyLanguage()
+    {
+        string S(string k) => AppStrings.Get(_lang, k);
+        TxtLangCode.Text = _lang == AppLanguage.Vi ? "VI" : "EN";
+        TxtTitleTag.Text = S("TitleTag");
+        TxtHideToTray.Text = S("HideTray");
+        TxtHeroTitle.Text = S("HeroTitle");
+        TxtHeroSub.Text = S("HeroSub");
+        TxtSectionConfig.Text = S("SectionConfig");
+        TxtTargetMonitor.Text = S("TargetMonitor");
+        BtnRefreshMonitors.Content = S("Refresh");
+        TxtFpsLabel.Text = S("FpsLabel");
+        TxtBitrateLabel.Text = S("BitrateLabel");
+        TxtEncoderLabel.Text = S("EncoderLabel");
+        ChkAutoRes.Content = S("AutoRes");
+        ChkMinimizeToTrayOnClose.Content = S("MinimizeToTray");
+        TxtSectionConnect.Text = S("SectionConnect");
+        TxtUsbTitle.Text = S("UsbTitle");
+        TxtWifiTitle.Text = S("WifiTitle");
+        TxtWifiHint.Text = S("WifiHint");
+        TxtStatClientsLabel.Text = S("StatClientsLabel");
+
+        if (_trayOpenItem is not null) _trayOpenItem.Text = S("TrayOpen");
+        if (_trayExitItem is not null) _trayExitItem.Text = S("TrayExit");
+
+        if (_isStreaming)
+        {
+            BtnToggleStream.Content = S("BtnStop");
+            if (_trayToggleItem is not null) _trayToggleItem.Text = S("BtnStop");
+            SetStatusBadge(S("StatusStreaming"), MediaColor.FromRgb(52, 211, 153));
+        }
+        else
+        {
+            BtnToggleStream.Content = S("BtnStart");
+            if (_trayToggleItem is not null) _trayToggleItem.Text = S("BtnStart");
+            SetStatusBadge(S("StatusReady"), MediaColor.FromRgb(56, 189, 248));
+            StatEncoder.Text = S("EncoderIdle");
+            StatClients.Text = $"0 {S("ClientsSuffix")}";
+        }
+    }
+
     private void HideToTray()
     {
         Hide();
-        _trayIcon?.ShowBalloonTip(1800, "PhoneDisplay", "Ứng dụng đang chạy nền trong System Tray.", WinForms.ToolTipIcon.Info);
+        _trayIcon?.ShowBalloonTip(1800, "PhoneDisplay", AppStrings.Get(_lang, "TrayBalloon"), WinForms.ToolTipIcon.Info);
     }
 
     private void RestoreFromTray()
@@ -175,6 +227,7 @@ public partial class MainWindow : Window
 
     private void RefreshMonitorList()
     {
+        int selectedBefore = CmbMonitor.SelectedIndex;
         _monitors = _displayManager.EnumerateMonitors().ToList();
         CmbMonitor.Items.Clear();
 
@@ -182,7 +235,7 @@ public partial class MainWindow : Window
         for (int i = 0; i < _monitors.Count; i++)
         {
             var m = _monitors[i];
-            string tag = m.IsPrimary ? "Chính" : "Mở rộng";
+            string tag = m.IsPrimary ? AppStrings.Get(_lang, "PrimaryTag") : AppStrings.Get(_lang, "ExtendedTag");
             var item = new ComboBoxItem
             {
                 Content = $"[{m.Index}] {m.DeviceName} — {m.Width}x{m.Height} ({tag})",
@@ -194,7 +247,7 @@ public partial class MainWindow : Window
         }
 
         if (CmbMonitor.Items.Count > 0)
-            CmbMonitor.SelectedIndex = defaultIdx;
+            CmbMonitor.SelectedIndex = selectedBefore >= 0 && selectedBefore < CmbMonitor.Items.Count ? selectedBefore : defaultIdx;
     }
 
     private void BtnRefreshMonitors_Click(object sender, RoutedEventArgs e) => RefreshMonitorList();
@@ -243,7 +296,7 @@ public partial class MainWindow : Window
         try
         {
             SetControlsEnabled(false);
-            SetStatusBadge("Đang khởi động...", MediaColor.FromRgb(251, 191, 36));
+            SetStatusBadge(AppStrings.Get(_lang, "StatusStarting"), MediaColor.FromRgb(251, 191, 36));
 
             _activeMonitor = selectedMonitor;
             _inputInjector = new InputInjector(selectedMonitor);
@@ -329,10 +382,10 @@ public partial class MainWindow : Window
             _captureTask = Task.Run(() => RunCaptureEncodeLoop(_streamCts.Token));
 
             _isStreaming = true;
-            BtnToggleStream.Content = "Dừng phát (Stop)";
+            BtnToggleStream.Content = AppStrings.Get(_lang, "BtnStop");
             BtnToggleStream.Background = new SolidColorBrush(MediaColor.FromRgb(220, 38, 38));
-            if (_trayToggleItem is not null) _trayToggleItem.Text = "Dừng phát (Stop)";
-            SetStatusBadge("Đang phát", MediaColor.FromRgb(52, 211, 153));
+            if (_trayToggleItem is not null) _trayToggleItem.Text = AppStrings.Get(_lang, "BtnStop");
+            SetStatusBadge(AppStrings.Get(_lang, "StatusStreaming"), MediaColor.FromRgb(52, 211, 153));
         }
         catch (Exception ex)
         {
@@ -371,15 +424,15 @@ public partial class MainWindow : Window
         _measuredFps = 0;
 
         SetControlsEnabled(true);
-        BtnToggleStream.Content = "Bắt đầu phát (Start)";
+        BtnToggleStream.Content = AppStrings.Get(_lang, "BtnStart");
         BtnToggleStream.Background = new LinearGradientBrush(
             MediaColor.FromRgb(14, 165, 233),
             MediaColor.FromRgb(37, 99, 235),
             0);
-        if (_trayToggleItem is not null) _trayToggleItem.Text = "Bắt đầu phát (Start)";
-        SetStatusBadge("Sẵn sàng", MediaColor.FromRgb(56, 189, 248));
-        StatEncoder.Text = "Chưa chạy";
-        StatClients.Text = "0 kết nối";
+        if (_trayToggleItem is not null) _trayToggleItem.Text = AppStrings.Get(_lang, "BtnStart");
+        SetStatusBadge(AppStrings.Get(_lang, "StatusReady"), MediaColor.FromRgb(56, 189, 248));
+        StatEncoder.Text = AppStrings.Get(_lang, "EncoderIdle");
+        StatClients.Text = $"0 {AppStrings.Get(_lang, "ClientsSuffix")}";
     }
 
     private void SetStatusBadge(string text, MediaColor color)
@@ -454,7 +507,7 @@ public partial class MainWindow : Window
             StatFps.Text = $"{_measuredFps:F0} / {_currentTargetFps}";
             StatEncMs.Text = $"{_encoder.LastEncodeLatencyMs:F1} ms";
             StatBitrate.Text = $"{_encoder.CurrentBitrateMbps:F1} Mbps";
-            StatClients.Text = $"{_server.ConnectedClientCount} kết nối";
+            StatClients.Text = $"{_server.ConnectedClientCount} {AppStrings.Get(_lang, "ClientsSuffix")}";
             StatEncoder.Text = _encoder.ActiveEncoderName;
 
             if (!string.IsNullOrEmpty(_encoder.LastError) && TxtErrorBanner.Visibility != Visibility.Visible)
@@ -554,13 +607,13 @@ public partial class MainWindow : Window
     private async void BtnCopyUsb_Click(object sender, RoutedEventArgs e)
     {
         System.Windows.Clipboard.SetText(TxtUsbUrl.Text);
-        await FlashButtonTextAsync(BtnCopyUsb, "Đã copy");
+        await FlashButtonTextAsync(BtnCopyUsb, AppStrings.Get(_lang, "Copied"));
     }
 
     private async void BtnCopyLan_Click(object sender, RoutedEventArgs e)
     {
         System.Windows.Clipboard.SetText(TxtLanUrl.Text);
-        await FlashButtonTextAsync(BtnCopyLan, "Đã copy");
+        await FlashButtonTextAsync(BtnCopyLan, AppStrings.Get(_lang, "Copied"));
     }
 
     private static async Task FlashButtonTextAsync(System.Windows.Controls.Button btn, string tempText)

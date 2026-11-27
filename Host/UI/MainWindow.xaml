@@ -207,14 +207,18 @@
                         </Border>
                         <TextBlock Text="PhoneDisplay" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"/>
                         <Border Margin="10,0,0,0" Padding="8,2" CornerRadius="999" Background="#162032" VerticalAlignment="Center">
-                            <TextBlock Text="ANDROID 2ND MONITOR" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/>
+                            <TextBlock x:Name="TxtTitleTag" Text="MÀN HÌNH PHỤ ANDROID" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/>
                         </Border>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnLangToggle" Style="{StaticResource TitleBarButton}"
+                                ToolTip="Switch Language (VI / EN)" Click="BtnLangToggle_Click" Margin="0,0,4,0">
+                            <TextBlock x:Name="TxtLangCode" Text="VI" FontSize="11.5" FontWeight="Bold" Foreground="#38BDF8"/>
+                        </Button>
                         <Button x:Name="BtnHideToTray" Style="{StaticResource TitleBarButton}"
                                 ToolTip="Ẩn xuống khay hệ thống (System Tray)" Click="BtnHideToTray_Click" Margin="0,0,4,0">
-                            <TextBlock Text="▾ Khay" FontSize="11.5" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="TxtHideToTray" Text="▾ Khay" FontSize="11.5" FontWeight="SemiBold"/>
                         </Button>
                         <Button Style="{StaticResource TitleBarButton}" ToolTip="Thu nhỏ" Click="BtnMinimize_Click">
                             <TextBlock Text="—" FontSize="12"/>
@@ -244,9 +248,9 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="Màn hình phụ không dây &amp; USB cho Windows 11"
+                        <TextBlock x:Name="TxtHeroTitle" Text="Màn hình phụ không dây &amp; USB cho Windows 11"
                                    FontSize="18" FontWeight="Bold" Foreground="#F8FAFC"/>
-                        <TextBlock Text="DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, cảm ứng kiểu Touchpad 9remote"
+                        <TextBlock x:Name="TxtHeroSub" Text="DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, cảm ứng kiểu Touchpad 9remote"
                                    FontSize="12.5" Foreground="#94A3B8" Margin="0,3,0,0"/>
                     </StackPanel>
 
@@ -276,10 +280,10 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Text="CẤU HÌNH PHÁT HÌNH" FontSize="11" FontWeight="Bold" Foreground="#60A5FA" Margin="0,0,0,12"/>
+                            <TextBlock x:Name="TxtSectionConfig" Text="CẤU HÌNH PHÁT HÌNH" FontSize="11" FontWeight="Bold" Foreground="#60A5FA" Margin="0,0,0,12"/>
 
                             <StackPanel Grid.Row="1">
-                                <TextBlock Text="Màn hình mục tiêu" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
+                                <TextBlock x:Name="TxtTargetMonitor" Text="Màn hình mục tiêu" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
                                 <Grid Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -298,7 +302,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Tần số quét (FPS)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
+                                        <TextBlock x:Name="TxtFpsLabel" Text="Tần số quét (FPS)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
                                         <ComboBox x:Name="CmbFps">
                                             <ComboBoxItem Content="60 FPS (Khuyên dùng)" Tag="60" IsSelected="True"/>
                                             <ComboBoxItem Content="90 FPS" Tag="90"/>
@@ -306,7 +310,7 @@
                                         </ComboBox>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Chất lượng (Bitrate)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
+                                        <TextBlock x:Name="TxtBitrateLabel" Text="Chất lượng (Bitrate)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
                                         <ComboBox x:Name="CmbBitrate">
                                             <ComboBoxItem Content="8 Mbps (Nhẹ)" Tag="8000"/>
                                             <ComboBoxItem Content="12 Mbps (Cân bằng)" Tag="12000" IsSelected="True"/>
@@ -316,7 +320,7 @@
                                     </StackPanel>
                                 </Grid>
 
-                                <TextBlock Text="Bộ mã hóa Video (Encoder)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
+                                <TextBlock x:Name="TxtEncoderLabel" Text="Bộ mã hóa Video (Encoder)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
                                 <ComboBox x:Name="CmbEncoder" Margin="0,0,0,14">
                                     <ComboBoxItem Content="Tự động (NVENC RTX → x264)" Tag="auto" IsSelected="True"/>
                                     <ComboBoxItem Content="NVIDIA NVENC (Phần cứng RTX)" Tag="nvenc"/>
@@ -367,13 +371,13 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Text="KẾT NỐI TRÊN ANDROID" FontSize="11" FontWeight="Bold" Foreground="#34D399" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="TxtSectionConnect" Text="KẾT NỐI TRÊN ANDROID" FontSize="11" FontWeight="Bold" Foreground="#34D399" Margin="0,0,0,10"/>
 
                             <!-- USB Box -->
                             <Border Grid.Row="1" Background="#0D111A" BorderBrush="#1E2636" BorderThickness="1"
                                     CornerRadius="10" Padding="12" Margin="0,0,0,12">
                                 <StackPanel>
-                                    <TextBlock Text="1. Cáp USB (Độ trễ thấp nhất)" FontSize="12.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+                                    <TextBlock x:Name="TxtUsbTitle" Text="1. Cáp USB (Độ trễ thấp nhất)" FontSize="12.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
                                     <TextBlock x:Name="TxtUsbStatus" Text="Đang kiểm tra ADB..." FontSize="11" Foreground="#94A3B8" Margin="0,3,0,8"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -401,7 +405,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
-                                    <TextBlock Text="2. Wi-Fi LAN (Quét QR bằng Chrome)" FontSize="12.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+                                    <TextBlock x:Name="TxtWifiTitle" Text="2. Wi-Fi LAN (Quét QR bằng Chrome)" FontSize="12.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
 
                                     <Border Grid.Row="1" Background="#FFFFFF" CornerRadius="10" Padding="8"
                                             HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,8">
@@ -422,7 +426,7 @@
                                                 Click="BtnCopyLan_Click"/>
                                     </Grid>
 
-                                    <TextBlock Grid.Row="3" Text="Lần đầu qua Wi-Fi: bấm Nâng cao → Tiếp tục truy cập"
+                                    <TextBlock x:Name="TxtWifiHint" Grid.Row="3" Text="Lần đầu qua Wi-Fi: bấm Nâng cao → Tiếp tục truy cập"
                                                FontSize="10.5" Foreground="#94A3B8" HorizontalAlignment="Center"/>
                                 </Grid>
                             </Border>
@@ -454,7 +458,7 @@
                             <TextBlock x:Name="StatBitrate" Text="-- Mbps" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC"/>
                         </StackPanel>
                         <StackPanel Grid.Column="3">
-                            <TextBlock Text="THIẾT BỊ" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                            <TextBlock x:Name="TxtStatClientsLabel" Text="THIẾT BỊ" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
                             <TextBlock x:Name="StatClients" Text="0 kết nối" FontSize="15" FontWeight="Bold" Foreground="#34D399"/>
                         </StackPanel>
                         <StackPanel Grid.Column="4">
