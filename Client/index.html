@@ -63,6 +63,7 @@
       <button id="pill-toggle-expand" class="pill-btn pill-handle" title="Toggle Menu">☰</button>
       <div id="pill-controls" class="pill-controls hidden">
         <button id="btn-mode" class="pill-btn" title="Switch Input Mode (View Only / Trackpad / Touch)">View Only</button>
+        <button id="btn-keyboard" class="pill-btn" title="Open Keyboard">⌨</button>
         <button id="btn-fps" class="pill-btn" title="Cycle FPS (60/90/120)">60 FPS</button>
         <button id="btn-bitrate" class="pill-btn" title="Cycle Bitrate (8/15/25 Mbps)">12M</button>
         <button id="btn-stats" class="pill-btn" title="Toggle Stats HUD">HUD</button>
@@ -71,10 +72,14 @@
       </div>
     </div>
 
+    <!-- Hidden input for triggering mobile soft keyboard -->
+    <input id="mobile-kbd-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+           style="position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;" />
+
     <!-- Connection Toast -->
     <div id="toast" class="toast hidden">Connecting...</div>
   </div>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

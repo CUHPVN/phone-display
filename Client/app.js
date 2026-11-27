@@ -12,6 +12,8 @@
   const pillToggleExpand = document.getElementById("pill-toggle-expand");
   const pillControls = document.getElementById("pill-controls");
   const btnMode = document.getElementById("btn-mode");
+  const btnKeyboard = document.getElementById("btn-keyboard");
+  const mobileKbdInput = document.getElementById("mobile-kbd-input");
   const btnFps = document.getElementById("btn-fps");
   const btnBitrate = document.getElementById("btn-bitrate");
   const btnStats = document.getElementById("btn-stats");
@@ -754,6 +756,74 @@
     btnMode.textContent = labels[inputMode];
     btnMode.classList.toggle("active", inputMode !== "view");
     showToast(hints[inputMode], 2600);
+  });
+
+  // --- Keyboard Support (PC physical keyboard + Mobile soft keyboard button) ---
+  let isComposing = false;
+
+  btnKeyboard.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (inputMode === "view") {
+      // Auto-switch from View Only to Trackpad when user explicitly opens keyboard
+      inputModeIndex = 1;
+      inputMode = "trackpad";
+      btnMode.textContent = "Trackpad";
+      btnMode.classList.add("active");
+    }
+    mobileKbdInput.value = "";
+    mobileKbdInput.focus();
+  });
+
+  mobileKbdInput.addEventListener("compositionstart", () => {
+    isComposing = true;
+  });
+
+  mobileKbdInput.addEventListener("compositionend", (e) => {
+    isComposing = false;
+    const text = e.data || mobileKbdInput.value;
+    if (text) {
+      sendControl({ type: "input", action: "text", text });
+    }
+    mobileKbdInput.value = "";
+  });
+
+  mobileKbdInput.addEventListener("input", () => {
+    if (isComposing) return;
+    const text = mobileKbdInput.value;
+    if (text) {
+      sendControl({ type: "input", action: "text", text });
+      mobileKbdInput.value = "";
+    }
+  });
+
+  mobileKbdInput.addEventListener("keydown", (e) => {
+    if (!isRunning) return;
+    if (["Backspace", "Enter", "Escape", "Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      e.preventDefault();
+      sendControl({ type: "input", action: "keydown", key: e.key, code: e.code });
+    }
+  });
+
+  mobileKbdInput.addEventListener("keyup", (e) => {
+    if (!isRunning) return;
+    if (["Backspace", "Enter", "Escape", "Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      e.preventDefault();
+      sendControl({ type: "input", action: "keyup", key: e.key, code: e.code });
+    }
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (!isRunning || inputMode === "view") return;
+    if (document.activeElement === mobileKbdInput || document.activeElement === inputPin) return;
+    e.preventDefault();
+    sendControl({ type: "input", action: "keydown", key: e.key, code: e.code });
+  });
+
+  window.addEventListener("keyup", (e) => {
+    if (!isRunning || inputMode === "view") return;
+    if (document.activeElement === mobileKbdInput || document.activeElement === inputPin) return;
+    e.preventDefault();
+    sendControl({ type: "input", action: "keyup", key: e.key, code: e.code });
   });
 
   btnFps.addEventListener("click", (e) => {

@@ -110,6 +110,21 @@ public sealed class InputInjector
                         SendMouseWheel(MOUSEEVENTF_HWHEEL, hDelta);
                     }
                     break;
+
+                case "keydown":
+                    if (TryMapVirtualKey(msg.Code, msg.Key, out ushort vkDown))
+                        SendKey(vkDown, keyUp: false);
+                    break;
+
+                case "keyup":
+                    if (TryMapVirtualKey(msg.Code, msg.Key, out ushort vkUp))
+                        SendKey(vkUp, keyUp: true);
+                    break;
+
+                case "text":
+                    if (!string.IsNullOrEmpty(msg.Text))
+                        SendUnicodeText(msg.Text);
+                    break;
             }
         }
         }
@@ -186,12 +201,177 @@ public sealed class InputInjector
         SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
     }
 
+    private static void SendKey(ushort vk, bool keyUp)
+    {
+        uint flags = keyUp ? KEYEVENTF_KEYUP : 0;
+        if (IsExtendedKey(vk)) flags |= KEYEVENTF_EXTENDEDKEY;
+
+        var input = new INPUT
+        {
+            type = INPUT_KEYBOARD,
+            U = new InputUnion
+            {
+                ki = new KEYBDINPUT
+                {
+                    wVk = vk,
+                    wScan = 0,
+                    dwFlags = flags
+                }
+            }
+        };
+        SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
+    }
+
+    private static void SendUnicodeText(string text)
+    {
+        var inputs = new INPUT[text.Length * 2];
+        int idx = 0;
+        foreach (char ch in text)
+        {
+            if (ch == '\n')
+            {
+                inputs[idx++] = new INPUT { type = INPUT_KEYBOARD, U = new InputUnion { ki = new KEYBDINPUT { wVk = 0x0D } } };
+                inputs[idx++] = new INPUT { type = INPUT_KEYBOARD, U = new InputUnion { ki = new KEYBDINPUT { wVk = 0x0D, dwFlags = KEYEVENTF_KEYUP } } };
+                continue;
+            }
+
+            inputs[idx++] = new INPUT
+            {
+                type = INPUT_KEYBOARD,
+                U = new InputUnion
+                {
+                    ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE }
+                }
+            };
+            inputs[idx++] = new INPUT
+            {
+                type = INPUT_KEYBOARD,
+                U = new InputUnion
+                {
+                    ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP }
+                }
+            };
+        }
+
+        if (idx > 0)
+            SendInput((uint)idx, inputs, Marshal.SizeOf<INPUT>());
+    }
+
+    private static bool IsExtendedKey(ushort vk) => vk is
+        0x21 or 0x22 or 0x23 or 0x24 or 0x25 or 0x26 or 0x27 or 0x28 or // PageUp..Down, Arrows
+        0x2D or 0x2E or 0x5B or 0x5C or 0xA3 or 0xA5; // Insert, Delete, LWin, RWin, RCtrl, RAlt
+
+    private static bool TryMapVirtualKey(string? code, string? key, out ushort vk)
+    {
+        if (!string.IsNullOrEmpty(code))
+        {
+            if (code.Length == 4 && code.StartsWith("Key", StringComparison.Ordinal) && code[3] is >= 'A' and <= 'Z')
+            {
+                vk = (ushort)code[3];
+                return true;
+            }
+            if (code.Length == 6 && code.StartsWith("Digit", StringComparison.Ordinal) && code[5] is >= '0' and <= '9')
+            {
+                vk = (ushort)code[5];
+                return true;
+            }
+            if (code.StartsWith("F", StringComparison.Ordinal) && int.TryParse(code[1..], out int fNum) && fNum is >= 1 and <= 12)
+            {
+                vk = (ushort)(0x6F + fNum);
+                return true;
+            }
+
+            ushort? mappedCode = code switch
+            {
+                "Backspace" => 0x08,
+                "Tab" => 0x09,
+                "Enter" or "NumpadEnter" => 0x0D,
+                "ShiftLeft" => 0xA0,
+                "ShiftRight" => 0xA1,
+                "ControlLeft" => 0xA2,
+                "ControlRight" => 0xA3,
+                "AltLeft" => 0xA4,
+                "AltRight" => 0xA5,
+                "CapsLock" => 0x14,
+                "Escape" => 0x1B,
+                "Space" => 0x20,
+                "PageUp" => 0x21,
+                "PageDown" => 0x22,
+                "End" => 0x23,
+                "Home" => 0x24,
+                "ArrowLeft" => 0x25,
+                "ArrowUp" => 0x26,
+                "ArrowRight" => 0x27,
+                "ArrowDown" => 0x28,
+                "Insert" => 0x2D,
+                "Delete" => 0x2E,
+                "MetaLeft" => 0x5B,
+                "MetaRight" => 0x5C,
+                "Semicolon" => 0xBA,
+                "Equal" => 0xBB,
+                "Comma" => 0xBC,
+                "Minus" => 0xBD,
+                "Period" => 0xBE,
+                "Slash" => 0xBF,
+                "Backquote" => 0xC0,
+                "BracketLeft" => 0xDB,
+                "Backslash" => 0xDC,
+                "BracketRight" => 0xDD,
+                "Quote" => 0xDE,
+                _ => null
+            };
+            if (mappedCode.HasValue)
+            {
+                vk = mappedCode.Value;
+                return true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(key))
+        {
+            ushort? mappedKey = key switch
+            {
+                "Backspace" => 0x08,
+                "Tab" => 0x09,
+                "Enter" => 0x0D,
+                "Shift" => 0x10,
+                "Control" => 0x11,
+                "Alt" => 0x12,
+                "Escape" => 0x1B,
+                " " => 0x20,
+                "PageUp" => 0x21,
+                "PageDown" => 0x22,
+                "End" => 0x23,
+                "Home" => 0x24,
+                "ArrowLeft" => 0x25,
+                "ArrowUp" => 0x26,
+                "ArrowRight" => 0x27,
+                "ArrowDown" => 0x28,
+                "Delete" => 0x2E,
+                _ when key.Length == 1 && char.IsLetterOrDigit(key[0]) => (ushort)char.ToUpperInvariant(key[0]),
+                _ => null
+            };
+            if (mappedKey.HasValue)
+            {
+                vk = mappedKey.Value;
+                return true;
+            }
+        }
+
+        vk = 0;
+        return false;
+    }
+
     private const int SM_XVIRTUALSCREEN = 76;
     private const int SM_YVIRTUALSCREEN = 77;
     private const int SM_CXVIRTUALSCREEN = 78;
     private const int SM_CYVIRTUALSCREEN = 79;
 
     private const uint INPUT_MOUSE = 0;
+    private const uint INPUT_KEYBOARD = 1;
+    private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint KEYEVENTF_UNICODE = 0x0004;
     private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     private const uint MOUSEEVENTF_LEFTUP = 0x0004;
@@ -229,6 +409,18 @@ public sealed class InputInjector
     {
         [FieldOffset(0)]
         public MOUSEINPUT mi;
+        [FieldOffset(0)]
+        public KEYBDINPUT ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public nint dwExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential)]

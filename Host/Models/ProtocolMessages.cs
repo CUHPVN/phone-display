@@ -52,6 +52,15 @@ public sealed class ClientMessage
 
     [JsonPropertyName("button")]
     public string? Button { get; set; }
+
+    [JsonPropertyName("key")]
+    public string? Key { get; set; }
+
+    [JsonPropertyName("code")]
+    public string? Code { get; set; }
+
+    [JsonPropertyName("text")]
+    public string? Text { get; set; }
 }
 
 public sealed class ServerInfoMessage
