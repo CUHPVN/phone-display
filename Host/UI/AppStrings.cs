@@ -19,8 +19,8 @@ public static class AppStrings
         (AppLanguage.Vi, "HeroTitle") => "Màn hình phụ không dây & USB cho Windows 11",
         (AppLanguage.En, "HeroTitle") => "Wireless & USB Extended Monitor for Windows 11",
 
-        (AppLanguage.Vi, "HeroSub") => "DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, cảm ứng kiểu Touchpad 9remote",
-        (AppLanguage.En, "HeroSub") => "DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Ultra-low latency, 9remote-style touchpad",
+        (AppLanguage.Vi, "HeroSub") => "DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, hỗ trợ Touchpad & Cảm ứng",
+        (AppLanguage.En, "HeroSub") => "DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Ultra-low latency, Touchpad & Touch control",
 
         (AppLanguage.Vi, "StatusReady") => "Sẵn sàng",
         (AppLanguage.En, "StatusReady") => "Ready",

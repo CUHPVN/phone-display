@@ -250,7 +250,7 @@
                     <StackPanel>
                         <TextBlock x:Name="TxtHeroTitle" Text="Màn hình phụ không dây &amp; USB cho Windows 11"
                                    FontSize="18" FontWeight="Bold" Foreground="#F8FAFC"/>
-                        <TextBlock x:Name="TxtHeroSub" Text="DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, cảm ứng kiểu Touchpad 9remote"
+                        <TextBlock x:Name="TxtHeroSub" Text="DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, hỗ trợ Touchpad &amp; Cảm ứng"
                                    FontSize="12.5" Foreground="#94A3B8" Margin="0,3,0,0"/>
                     </StackPanel>
 
