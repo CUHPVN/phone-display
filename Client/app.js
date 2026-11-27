@@ -1,0 +1,651 @@
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("display-canvas");
+  const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+  const landingOverlay = document.getElementById("landing-overlay");
+  const insecureBanner = document.getElementById("insecure-banner");
+  const btnSwitchHttps = document.getElementById("btn-switch-https");
+  const btnStart = document.getElementById("btn-start");
+  const statsHud = document.getElementById("stats-hud");
+  const miniPill = document.getElementById("mini-pill");
+  const pillToggleExpand = document.getElementById("pill-toggle-expand");
+  const pillControls = document.getElementById("pill-controls");
+  const btnMode = document.getElementById("btn-mode");
+  const btnFps = document.getElementById("btn-fps");
+  const btnBitrate = document.getElementById("btn-bitrate");
+  const btnStats = document.getElementById("btn-stats");
+  const btnReconnect = document.getElementById("btn-reconnect");
+  const btnExit = document.getElementById("btn-exit");
+  const toastEl = document.getElementById("toast");
+
+  const statRes = document.getElementById("stat-res");
+  const statFps = document.getElementById("stat-fps");
+  const statEnc = document.getElementById("stat-enc");
+  const statRtt = document.getElementById("stat-rtt");
+  const statEncName = document.getElementById("stat-enc-name");
+
+  // Secure context check (WebCodecs requires HTTPS on Wi-Fi or localhost on USB)
+  const hasWebCodecs = typeof window.VideoDecoder === "function";
+  if (!window.isSecureContext || !hasWebCodecs) {
+    insecureBanner.classList.remove("hidden");
+  }
+
+  btnSwitchHttps.addEventListener("click", () => {
+    window.location.href = `https://${window.location.hostname}:8443${window.location.pathname}`;
+  });
+
+  // State
+  let ws = null;
+  let decoder = null;
+  let wakeLock = null;
+  let isRunning = false;
+  let waitingForKeyframe = true;
+  let reconnectTimer = null;
+  let pingTimer = null;
+  let pillFadeTimer = null;
+
+  let videoWidth = 1920;
+  let videoHeight = 1080;
+  let drawRect = { x: 0, y: 0, w: 1920, h: 1080 };
+
+  const inputModes = ["trackpad", "touch", "view"];
+  let inputModeIndex = 0;
+  let inputMode = "trackpad"; // "trackpad" | "touch" | "view"
+  const fpsPresets = [60, 90, 120];
+  let fpsPresetIndex = 0;
+  const bitratePresets = [8000, 12000, 20000, 30000];
+  let bitratePresetIndex = 1;
+
+  // Metrics
+  let decodedFramesCount = 0;
+  let lastFpsTick = performance.now();
+  let lastEncodeLatencyMs = 0;
+  let lastRttMs = 0;
+  let activeEncoderName = "--";
+
+  function showToast(msg, durationMs = 2200) {
+    toastEl.textContent = msg;
+    toastEl.classList.remove("hidden");
+    clearTimeout(toastEl._timer);
+    if (durationMs > 0) {
+      toastEl._timer = setTimeout(() => toastEl.classList.add("hidden"), durationMs);
+    }
+  }
+
+  function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const targetW = Math.max(1, Math.floor(window.innerWidth * dpr));
+    const targetH = Math.max(1, Math.floor(window.innerHeight * dpr));
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
+    computeDrawRect();
+  }
+
+  function computeDrawRect() {
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const videoAspect = videoWidth / Math.max(1, videoHeight);
+    const canvasAspect = cw / Math.max(1, ch);
+
+    let dw, dh, dx, dy;
+    if (canvasAspect > videoAspect) {
+      dh = ch;
+      dw = Math.round(ch * videoAspect);
+      dx = Math.round((cw - dw) / 2);
+      dy = 0;
+    } else {
+      dw = cw;
+      dh = Math.round(cw / videoAspect);
+      dx = 0;
+      dy = Math.round((ch - dh) / 2);
+    }
+    drawRect = { x: dx, y: dy, w: dw, h: dh };
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+
+  async function acquireImmersiveMode() {
+    try {
+      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+      }
+    } catch { /* ignore if blocked */ }
+
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock("landscape");
+      }
+    } catch { /* ignore on unsupported browsers */ }
+
+    await requestWakeLock();
+  }
+
+  async function requestWakeLock() {
+    try {
+      if ("wakeLock" in navigator && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => {
+          wakeLock = null;
+        });
+      }
+    } catch { /* ignore */ }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (isRunning && document.visibilityState === "visible") {
+      requestWakeLock();
+      sendControl({ type: "keyframe" });
+    }
+  });
+
+  function initDecoder(codec = "avc1.42E033") {
+    closeDecoder();
+    if (!hasWebCodecs) {
+      showToast("WebCodecs unsupported here. Use HTTPS or USB localhost.", 5000);
+      return;
+    }
+
+    waitingForKeyframe = true;
+    decoder = new VideoDecoder({
+      output: (frame) => {
+        try {
+          if (frame.displayWidth !== videoWidth || frame.displayHeight !== videoHeight) {
+            videoWidth = frame.displayWidth;
+            videoHeight = frame.displayHeight;
+            computeDrawRect();
+            statRes.textContent = `${videoWidth}x${videoHeight}`;
+          }
+
+          ctx.fillStyle = "#000000";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(frame, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+
+          decodedFramesCount++;
+          const now = performance.now();
+          if (now - lastFpsTick >= 1000) {
+            const fps = (decodedFramesCount * 1000) / (now - lastFpsTick);
+            statFps.textContent = `${fps.toFixed(0)} FPS`;
+            statEnc.textContent = `Enc ${lastEncodeLatencyMs.toFixed(1)}ms`;
+            statRtt.textContent = `RTT ${lastRttMs}ms`;
+            statEncName.textContent = activeEncoderName;
+            decodedFramesCount = 0;
+            lastFpsTick = now;
+          }
+        } finally {
+          frame.close();
+        }
+      },
+      error: (err) => {
+        console.error("VideoDecoder error:", err);
+        showToast(`Decoder error: ${err?.message || err}`, 3000);
+        waitingForKeyframe = true;
+        sendControl({ type: "keyframe" });
+      }
+    });
+
+    decoder.configure({
+      codec,
+      hardwareAcceleration: "prefer-hardware",
+      optimizeForLatency: true
+    });
+  }
+
+  function closeDecoder() {
+    if (decoder) {
+      try {
+        if (decoder.state !== "closed") decoder.close();
+      } catch { /* ignore */ }
+      decoder = null;
+    }
+  }
+
+  function connectWebSocket() {
+    clearTimeout(reconnectTimer);
+    if (ws) {
+      try { ws.close(); } catch { }
+      ws = null;
+    }
+
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${proto}//${window.location.host}/ws`;
+    showToast("Connecting...", 0);
+
+    ws = new WebSocket(wsUrl);
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = () => {
+      showToast("Connected", 1200);
+      initDecoder();
+
+      const dpr = window.devicePixelRatio || 1;
+      const physW = Math.round(Math.max(window.screen.width, window.screen.height) * dpr);
+      const physH = Math.round(Math.min(window.screen.width, window.screen.height) * dpr);
+
+      sendControl({
+        type: "hello",
+        width: physW,
+        height: physH,
+        dpr,
+        refreshRate: fpsPresets[fpsPresetIndex]
+      });
+
+      clearInterval(pingTimer);
+      pingTimer = setInterval(() => {
+        sendControl({ type: "ping", ts: Date.now() });
+      }, 2000);
+    };
+
+    ws.onmessage = (ev) => {
+      if (typeof ev.data === "string") {
+        handleServerText(ev.data);
+        return;
+      }
+
+      handleVideoPacket(ev.data);
+    };
+
+    ws.onclose = () => {
+      clearInterval(pingTimer);
+      closeDecoder();
+      if (isRunning) {
+        showToast("Reconnecting...", 0);
+        reconnectTimer = setTimeout(connectWebSocket, 1200);
+      }
+    };
+
+    ws.onerror = () => {
+      // onclose will handle reconnect
+    };
+  }
+
+  function handleServerText(text) {
+    let msg;
+    try { msg = JSON.parse(text); } catch { return; }
+
+    if (msg.type === "info") {
+      videoWidth = msg.width || videoWidth;
+      videoHeight = msg.height || videoHeight;
+      activeEncoderName = msg.encoder || "--";
+      statRes.textContent = `${videoWidth}x${videoHeight}`;
+      statEncName.textContent = activeEncoderName;
+      computeDrawRect();
+      waitingForKeyframe = true;
+      if (decoder && decoder.state === "closed") {
+        initDecoder(msg.codec || "avc1.42E028");
+      }
+    } else if (msg.type === "pong") {
+      lastRttMs = Math.max(0, Date.now() - (msg.ts || Date.now()));
+    }
+  }
+
+  function handleVideoPacket(arrayBuffer) {
+    if (!decoder || decoder.state !== "configured") return;
+    if (arrayBuffer.byteLength <= 13) return;
+
+    const view = new DataView(arrayBuffer);
+    const frameType = view.getUint8(0); // 1 = keyframe, 0 = delta
+    const isKeyframe = frameType === 1;
+    const tsHigh = view.getUint32(1);
+    const tsLow = view.getUint32(5);
+    const timestampUs = tsHigh * 4294967296 + tsLow;
+    const encodeUs = view.getUint32(9);
+    lastEncodeLatencyMs = encodeUs / 1000.0;
+
+    if (waitingForKeyframe && !isKeyframe) {
+      return;
+    }
+
+    // Drop delta frames if decoder queue backs up to keep zero-buffer latency
+    if (decoder.decodeQueueSize > 2 && !isKeyframe) {
+      return;
+    }
+
+    waitingForKeyframe = false;
+    const payload = new Uint8Array(arrayBuffer, 13);
+
+    try {
+      const chunk = new EncodedVideoChunk({
+        type: isKeyframe ? "key" : "delta",
+        timestamp: timestampUs,
+        data: payload
+      });
+      decoder.decode(chunk);
+    } catch (err) {
+      console.warn("Decode chunk failed:", err);
+      waitingForKeyframe = true;
+      sendControl({ type: "keyframe" });
+    }
+  }
+
+  function sendControl(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(obj));
+    }
+  }
+
+  // --- Pointer / Touch & Trackpad Handling (9remote-style modes) ---
+  const activePointers = new Map();
+  let trackpadSubPixelX = 0;
+  let trackpadSubPixelY = 0;
+  let lastTapTime = 0;
+
+  let gestureState = {
+    mode: "none", // "single" | "scroll"
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    startTime: 0,
+    moved: false,
+    isDraggingLeft: false,
+    longPressFired: false,
+    longPressTimer: null,
+    twoFingerLastMidX: 0,
+    twoFingerLastMidY: 0,
+    twoFingerMoved: false
+  };
+
+  function clientToNormalized(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / Math.max(1, rect.width);
+    const scaleY = canvas.height / Math.max(1, rect.height);
+    const cx = (clientX - rect.left) * scaleX;
+    const cy = (clientY - rect.top) * scaleY;
+
+    const nx = (cx - drawRect.x) / Math.max(1, drawRect.w);
+    const ny = (cy - drawRect.y) / Math.max(1, rect.h);
+    return {
+      x: Math.min(1, Math.max(0, nx)),
+      y: Math.min(1, Math.max(0, ny))
+    };
+  }
+
+  function clearLongPress() {
+    if (gestureState.longPressTimer) {
+      clearTimeout(gestureState.longPressTimer);
+      gestureState.longPressTimer = null;
+    }
+  }
+
+  function vibrateShort() {
+    if (navigator.vibrate) {
+      try { navigator.vibrate(25); } catch { }
+    }
+  }
+
+  let lastMoveSentAt = 0;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!isRunning || inputMode === "view") return;
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.size === 1) {
+      const now = performance.now();
+      gestureState.mode = "single";
+      gestureState.startX = e.clientX;
+      gestureState.startY = e.clientY;
+      gestureState.lastX = e.clientX;
+      gestureState.lastY = e.clientY;
+      gestureState.startTime = now;
+      gestureState.moved = false;
+      gestureState.longPressFired = false;
+      gestureState.isDraggingLeft = false;
+
+      if (inputMode === "touch") {
+        const norm = clientToNormalized(e.clientX, e.clientY);
+        sendControl({ type: "input", action: "down", x: norm.x, y: norm.y });
+
+        clearLongPress();
+        gestureState.longPressTimer = setTimeout(() => {
+          if (!gestureState.moved && activePointers.size === 1) {
+            const curNorm = clientToNormalized(gestureState.lastX, gestureState.lastY);
+            sendControl({ type: "input", action: "rightclick", x: curNorm.x, y: curNorm.y });
+            gestureState.longPressFired = true;
+            gestureState.moved = true;
+            vibrateShort();
+          }
+        }, 450);
+      } else if (inputMode === "trackpad") {
+        // Double-tap & hold -> Left-button drag
+        if (now - lastTapTime < 280) {
+          gestureState.isDraggingLeft = true;
+          sendControl({ type: "input", action: "leftdown" });
+          vibrateShort();
+        } else {
+          clearLongPress();
+          gestureState.longPressTimer = setTimeout(() => {
+            if (!gestureState.moved && activePointers.size === 1) {
+              sendControl({ type: "input", action: "trackpad_rightclick" });
+              gestureState.longPressFired = true;
+              gestureState.moved = true;
+              vibrateShort();
+            }
+          }, 450);
+        }
+      }
+    } else if (activePointers.size === 2) {
+      clearLongPress();
+      if (gestureState.isDraggingLeft) {
+        sendControl({ type: "input", action: "leftup" });
+        gestureState.isDraggingLeft = false;
+      }
+      if (inputMode === "touch" && gestureState.mode === "single") {
+        const norm = clientToNormalized(e.clientX, e.clientY);
+        sendControl({ type: "input", action: "up", x: norm.x, y: norm.y });
+      }
+      gestureState.mode = "scroll";
+      gestureState.twoFingerMoved = false;
+      const pts = Array.from(activePointers.values());
+      gestureState.twoFingerLastMidX = (pts[0].x + pts[1].x) / 2;
+      gestureState.twoFingerLastMidY = (pts[0].y + pts[1].y) / 2;
+    }
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!isRunning || inputMode === "view" || !activePointers.has(e.pointerId)) return;
+    e.preventDefault();
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const now = performance.now();
+    if (now - lastMoveSentAt < 6) return;
+    lastMoveSentAt = now;
+
+    if (gestureState.mode === "single" && activePointers.size === 1) {
+      const dx = e.clientX - gestureState.lastX;
+      const dy = e.clientY - gestureState.lastY;
+      const totalDist = Math.hypot(e.clientX - gestureState.startX, e.clientY - gestureState.startY);
+      if (totalDist > 7) {
+        gestureState.moved = true;
+        clearLongPress();
+      }
+
+      if (inputMode === "touch") {
+        const norm = clientToNormalized(e.clientX, e.clientY);
+        sendControl({ type: "input", action: "move", x: norm.x, y: norm.y });
+      } else if (inputMode === "trackpad") {
+        // Laptop-like touchpad acceleration + sub-pixel accumulation
+        const speed = Math.hypot(dx, dy);
+        const gain = speed > 18 ? 2.4 : speed > 7 ? 1.8 : 1.35;
+        trackpadSubPixelX += dx * gain;
+        trackpadSubPixelY += dy * gain;
+        const sendDx = Math.trunc(trackpadSubPixelX);
+        const sendDy = Math.trunc(trackpadSubPixelY);
+        if (sendDx !== 0 || sendDy !== 0) {
+          trackpadSubPixelX -= sendDx;
+          trackpadSubPixelY -= sendDy;
+          sendControl({
+            type: "input",
+            action: "trackpad_move",
+            dx: sendDx,
+            dy: sendDy
+          });
+        }
+      }
+
+      gestureState.lastX = e.clientX;
+      gestureState.lastY = e.clientY;
+    } else if (gestureState.mode === "scroll" && activePointers.size === 2) {
+      const pts = Array.from(activePointers.values());
+      const midX = (pts[0].x + pts[1].x) / 2;
+      const midY = (pts[0].y + pts[1].y) / 2;
+      const dMidX = midX - gestureState.twoFingerLastMidX;
+      const dMidY = midY - gestureState.twoFingerLastMidY;
+
+      if (Math.hypot(dMidX, dMidY) > 3) {
+        gestureState.twoFingerMoved = true;
+        sendControl({
+          type: "input",
+          action: "scroll",
+          wheelX: -dMidX / 40,
+          wheelY: dMidY / 40
+        });
+        gestureState.twoFingerLastMidX = midX;
+        gestureState.twoFingerLastMidY = midY;
+      }
+    }
+  });
+
+  function handlePointerEnd(e) {
+    if (!activePointers.has(e.pointerId)) return;
+    activePointers.delete(e.pointerId);
+    clearLongPress();
+
+    if (gestureState.mode === "single") {
+      if (inputMode === "touch") {
+        const norm = clientToNormalized(e.clientX, e.clientY);
+        sendControl({ type: "input", action: "up", x: norm.x, y: norm.y });
+      } else if (inputMode === "trackpad") {
+        if (gestureState.isDraggingLeft) {
+          sendControl({ type: "input", action: "leftup" });
+          gestureState.isDraggingLeft = false;
+        } else {
+          const elapsed = performance.now() - gestureState.startTime;
+          if (!gestureState.moved && !gestureState.longPressFired && elapsed < 260) {
+            sendControl({ type: "input", action: "leftclick" });
+            lastTapTime = performance.now();
+          }
+        }
+      }
+    } else if (gestureState.mode === "scroll" && activePointers.size === 0) {
+      if (!gestureState.twoFingerMoved && inputMode !== "view") {
+        sendControl({ type: "input", action: "trackpad_rightclick" });
+        vibrateShort();
+      }
+    }
+
+    if (activePointers.size === 0) {
+      gestureState.mode = "none";
+    }
+  }
+
+  canvas.addEventListener("pointerup", handlePointerEnd);
+  canvas.addEventListener("pointercancel", handlePointerEnd);
+
+  // --- Floating Mini-Pill Controls ---
+  function resetPillFade() {
+    clearTimeout(pillFadeTimer);
+    miniPill.classList.add("expanded");
+    pillFadeTimer = setTimeout(() => {
+      if (pillControls.classList.contains("hidden")) {
+        miniPill.classList.remove("expanded");
+      }
+    }, 3000);
+  }
+
+  pillToggleExpand.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isHidden = pillControls.classList.toggle("hidden");
+    if (isHidden) {
+      resetPillFade();
+    } else {
+      clearTimeout(pillFadeTimer);
+      miniPill.classList.add("expanded");
+    }
+  });
+
+  btnMode.addEventListener("click", (e) => {
+    e.stopPropagation();
+    inputModeIndex = (inputModeIndex + 1) % inputModes.length;
+    inputMode = inputModes[inputModeIndex];
+    const labels = {
+      trackpad: "Trackpad",
+      touch: "Touch",
+      view: "View Only"
+    };
+    const hints = {
+      trackpad: "Trackpad (1-finger move, tap=click, 2x-drag, 2-finger=scroll/right)",
+      touch: "Touch (Direct tap & drag)",
+      view: "View Only (Input locked)"
+    };
+    btnMode.textContent = labels[inputMode];
+    btnMode.classList.toggle("active", inputMode !== "view");
+    showToast(hints[inputMode], 2600);
+  });
+
+  btnFps.addEventListener("click", (e) => {
+    e.stopPropagation();
+    fpsPresetIndex = (fpsPresetIndex + 1) % fpsPresets.length;
+    const fps = fpsPresets[fpsPresetIndex];
+    btnFps.textContent = `${fps} FPS`;
+    sendControl({ type: "config", fps });
+    showToast(`Target FPS: ${fps}`);
+  });
+
+  btnBitrate.addEventListener("click", (e) => {
+    e.stopPropagation();
+    bitratePresetIndex = (bitratePresetIndex + 1) % bitratePresets.length;
+    const kbps = bitratePresets[bitratePresetIndex];
+    btnBitrate.textContent = `${Math.round(kbps / 1000)}M`;
+    sendControl({ type: "config", bitrateKbps: kbps });
+    showToast(`Bitrate: ${Math.round(kbps / 1000)} Mbps`);
+  });
+
+  btnStats.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const hidden = statsHud.classList.toggle("hidden");
+    btnStats.classList.toggle("active", !hidden);
+  });
+
+  btnReconnect.addEventListener("click", (e) => {
+    e.stopPropagation();
+    connectWebSocket();
+  });
+
+  btnExit.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    isRunning = false;
+    clearTimeout(reconnectTimer);
+    clearInterval(pingTimer);
+    if (ws) {
+      try { ws.close(); } catch { }
+      ws = null;
+    }
+    closeDecoder();
+
+    if (wakeLock) {
+      try { await wakeLock.release(); } catch { }
+      wakeLock = null;
+    }
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch { }
+    }
+
+    miniPill.classList.add("hidden");
+    statsHud.classList.add("hidden");
+    landingOverlay.classList.remove("hidden");
+  });
+
+  btnStart.addEventListener("click", async () => {
+    isRunning = true;
+    landingOverlay.classList.add("hidden");
+    miniPill.classList.remove("hidden");
+    resizeCanvas();
+    await acquireImmersiveMode();
+    connectWebSocket();
+  });
+})();

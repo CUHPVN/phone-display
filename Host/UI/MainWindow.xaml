@@ -1,0 +1,469 @@
+<Window x:Class="PhoneDisplay.Host.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="PhoneDisplay — Extended Android Monitor"
+        Width="840"
+        Height="690"
+        MinWidth="780"
+        MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanMinimize"
+        Background="#0B0E14"
+        Foreground="#F4F4F5"
+        FontFamily="Segoe UI">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="46"
+                            ResizeBorderThickness="0"
+                            CornerRadius="12"
+                            GlassFrameThickness="0"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#161B26"/>
+            <Setter Property="Foreground" Value="#F4F4F5"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1D4ED8"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0284C7"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#141923"/>
+            <Setter Property="Foreground" Value="#F4F4F5"/>
+            <Setter Property="BorderBrush" Value="#252D3D"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Border" Background="#141923" BorderBrush="#263042" BorderThickness="1" CornerRadius="8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="30"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Data="M 0 0 L 4.5 4.5 L 9 0 Z" Fill="#94A3B8"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Border" Property="BorderBrush" Value="#38BDF8"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="12,0,30,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"
+                                              TextElement.Foreground="#F4F4F5"/>
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Border x:Name="DropDownBorder"
+                                        MinWidth="{TemplateBinding ActualWidth}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                        Background="#161B26"
+                                        BorderBrush="#334155"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Margin="0,3,0,0">
+                                    <ScrollViewer SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CardBorder" TargetType="Border">
+            <Setter Property="Background" Value="#121620"/>
+            <Setter Property="BorderBrush" Value="#1F2737"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="18"/>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#1B2230"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="#2B3548"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#252F42"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#38BDF8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TitleBarButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinWidth" Value="36"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="8,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E293B"/>
+                                <Setter Property="Foreground" Value="#F8FAFC"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Background="#0B0E14">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="46"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Custom Dark Title Bar -->
+            <Border Grid.Row="0" Background="#0E121A" BorderBrush="#1A2230" BorderThickness="0,0,0,1" CornerRadius="10,10,0,0">
+                <Grid Margin="16,0,10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="24" Height="24" CornerRadius="6" Margin="0,0,10,0">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#0EA5E9" Offset="0"/>
+                                    <GradientStop Color="#2563EB" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <TextBlock Text="PD" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="PhoneDisplay" FontSize="14" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center"/>
+                        <Border Margin="10,0,0,0" Padding="8,2" CornerRadius="999" Background="#162032" VerticalAlignment="Center">
+                            <TextBlock Text="ANDROID 2ND MONITOR" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnHideToTray" Style="{StaticResource TitleBarButton}"
+                                ToolTip="Ẩn xuống khay hệ thống (System Tray)" Click="BtnHideToTray_Click" Margin="0,0,4,0">
+                            <TextBlock Text="▾ Khay" FontSize="11.5" FontWeight="SemiBold"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButton}" ToolTip="Thu nhỏ" Click="BtnMinimize_Click">
+                            <TextBlock Text="—" FontSize="12"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButton}" ToolTip="Đóng (Ẩn xuống khay hoặc Thoát)" Click="BtnClose_Click">
+                            <TextBlock Text="✕" FontSize="12"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Body -->
+            <Grid Grid.Row="1" Margin="20,16,20,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Hero Header -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="Màn hình phụ không dây &amp; USB cho Windows 11"
+                                   FontSize="18" FontWeight="Bold" Foreground="#F8FAFC"/>
+                        <TextBlock Text="DXGI Zero-Copy + NVIDIA NVENC + WebCodecs — Độ trễ siêu thấp, cảm ứng kiểu Touchpad 9remote"
+                                   FontSize="12.5" Foreground="#94A3B8" Margin="0,3,0,0"/>
+                    </StackPanel>
+
+                    <Border Grid.Column="1" VerticalAlignment="Center" CornerRadius="999" Padding="14,7"
+                            x:Name="StatusBadge" Background="#141E2E" BorderBrush="#23324D" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#38BDF8" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtStatusBadge" Text="Sẵn sàng" FontSize="12.5" FontWeight="SemiBold" Foreground="#38BDF8"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Main Two-Column Area -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.12*"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="0.88*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left Card: Stream Configuration -->
+                    <Border Grid.Column="0" Style="{StaticResource CardBorder}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="CẤU HÌNH PHÁT HÌNH" FontSize="11" FontWeight="Bold" Foreground="#60A5FA" Margin="0,0,0,12"/>
+
+                            <StackPanel Grid.Row="1">
+                                <TextBlock Text="Màn hình mục tiêu" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="CmbMonitor" Grid.Column="0"/>
+                                    <Button x:Name="BtnRefreshMonitors" Grid.Column="2" Content="Làm mới"
+                                            Style="{StaticResource SecondaryButton}" Click="BtnRefreshMonitors_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Tần số quét (FPS)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CmbFps">
+                                            <ComboBoxItem Content="60 FPS (Khuyên dùng)" Tag="60" IsSelected="True"/>
+                                            <ComboBoxItem Content="90 FPS" Tag="90"/>
+                                            <ComboBoxItem Content="120 FPS (Cáp USB)" Tag="120"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Chất lượng (Bitrate)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="CmbBitrate">
+                                            <ComboBoxItem Content="8 Mbps (Nhẹ)" Tag="8000"/>
+                                            <ComboBoxItem Content="12 Mbps (Cân bằng)" Tag="12000" IsSelected="True"/>
+                                            <ComboBoxItem Content="20 Mbps (Nét)" Tag="20000"/>
+                                            <ComboBoxItem Content="30 Mbps (Tối đa)" Tag="30000"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="Bộ mã hóa Video (Encoder)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,5"/>
+                                <ComboBox x:Name="CmbEncoder" Margin="0,0,0,14">
+                                    <ComboBoxItem Content="Tự động (NVENC RTX → x264)" Tag="auto" IsSelected="True"/>
+                                    <ComboBoxItem Content="NVIDIA NVENC (Phần cứng RTX)" Tag="nvenc"/>
+                                    <ComboBoxItem Content="CPU libx264" Tag="x264"/>
+                                </ComboBox>
+
+                                <CheckBox x:Name="ChkAutoRes" IsChecked="True" Foreground="#CBD5E1" FontSize="12" Margin="0,0,0,8"
+                                          Content="Tự khớp độ phân giải màn hình phụ theo điện thoại"/>
+
+                                <CheckBox x:Name="ChkMinimizeToTrayOnClose" IsChecked="True" Foreground="#94A3B8" FontSize="12"
+                                          Content="Ẩn xuống System Tray khi bấm đóng (X)"/>
+
+                                <TextBlock x:Name="TxtErrorBanner" Text="" Foreground="#F87171" FontSize="12"
+                                           TextWrapping="Wrap" Margin="0,10,0,0" Visibility="Collapsed"/>
+                            </StackPanel>
+
+                            <Button x:Name="BtnToggleStream" Grid.Row="2" Height="46" FontSize="15" FontWeight="Bold"
+                                    Foreground="#FFFFFF" BorderThickness="0" Cursor="Hand"
+                                    Content="Bắt đầu phát (Start)" Click="BtnToggleStream_Click" Margin="0,12,0,0">
+                                <Button.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#0EA5E9" Offset="0"/>
+                                        <GradientStop Color="#2563EB" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Button.Background>
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="10">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Opacity" Value="0.92"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- Right Card: Connection (USB + Wi-Fi QR) -->
+                    <Border Grid.Column="2" Style="{StaticResource CardBorder}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="KẾT NỐI TRÊN ANDROID" FontSize="11" FontWeight="Bold" Foreground="#34D399" Margin="0,0,0,10"/>
+
+                            <!-- USB Box -->
+                            <Border Grid.Row="1" Background="#0D111A" BorderBrush="#1E2636" BorderThickness="1"
+                                    CornerRadius="10" Padding="12" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="1. Cáp USB (Độ trễ thấp nhất)" FontSize="12.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+                                    <TextBlock x:Name="TxtUsbStatus" Text="Đang kiểm tra ADB..." FontSize="11" Foreground="#94A3B8" Margin="0,3,0,8"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="TxtUsbUrl" Text="http://localhost:8080" IsReadOnly="True"
+                                                 Background="#151C28" Foreground="#38BDF8" BorderThickness="0"
+                                                 Padding="10,7" FontFamily="Consolas" FontSize="12"/>
+                                        <Button x:Name="BtnCopyUsb" Grid.Column="2" Content="Copy" Style="{StaticResource SecondaryButton}"
+                                                Click="BtnCopyUsb_Click"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Wi-Fi QR Box -->
+                            <Border Grid.Row="2" Background="#0D111A" BorderBrush="#1E2636" BorderThickness="1"
+                                    CornerRadius="10" Padding="12">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="2. Wi-Fi LAN (Quét QR bằng Chrome)" FontSize="12.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+
+                                    <Border Grid.Row="1" Background="#FFFFFF" CornerRadius="10" Padding="8"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,8">
+                                        <Image x:Name="ImgQrCode" Width="128" Height="128" Stretch="Uniform"
+                                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                    </Border>
+
+                                    <Grid Grid.Row="2" Margin="0,4,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="TxtLanUrl" Text="https://192.168.1.11:8443" IsReadOnly="True"
+                                                 Background="#151C28" Foreground="#FBBF24" BorderThickness="0"
+                                                 Padding="10,7" FontFamily="Consolas" FontSize="12"/>
+                                        <Button x:Name="BtnCopyLan" Grid.Column="2" Content="Copy" Style="{StaticResource SecondaryButton}"
+                                                Click="BtnCopyLan_Click"/>
+                                    </Grid>
+
+                                    <TextBlock Grid.Row="3" Text="Lần đầu qua Wi-Fi: bấm Nâng cao → Tiếp tục truy cập"
+                                               FontSize="10.5" Foreground="#94A3B8" HorizontalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Bottom Live Stats Bar -->
+                <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="16,11">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="1.5*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="FPS" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                            <TextBlock x:Name="StatFps" Text="-- / 60" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="ENCODE" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                            <TextBlock x:Name="StatEncMs" Text="-- ms" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="BITRATE" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                            <TextBlock x:Name="StatBitrate" Text="-- Mbps" FontSize="15" FontWeight="Bold" Foreground="#F8FAFC"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3">
+                            <TextBlock Text="THIẾT BỊ" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                            <TextBlock x:Name="StatClients" Text="0 kết nối" FontSize="15" FontWeight="Bold" Foreground="#34D399"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="ENCODER" FontSize="10" FontWeight="SemiBold" Foreground="#64748B"/>
+                            <TextBlock x:Name="StatEncoder" Text="Chưa chạy" FontSize="13.5" FontWeight="SemiBold" Foreground="#38BDF8" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
