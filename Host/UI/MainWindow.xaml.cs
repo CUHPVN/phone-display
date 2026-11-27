@@ -17,8 +17,6 @@ using PhoneDisplay.Host.Network;
 using QRCoder;
 using WinForms = System.Windows.Forms;
 using MediaColor = System.Windows.Media.Color;
-using MediaBrush = System.Windows.Media.Brush;
-using MediaBrushes = System.Windows.Media.Brushes;
 
 namespace PhoneDisplay.Host.UI;
 
@@ -110,7 +108,7 @@ public partial class MainWindow : Window
 
         _trayIcon = new WinForms.NotifyIcon
         {
-            Text = "PhoneDisplay — Android 2nd Monitor",
+            Text = "PhoneDisplay",
             Icon = CreateTrayBadgeIcon(),
             ContextMenuStrip = menu,
             Visible = true
@@ -123,11 +121,7 @@ public partial class MainWindow : Window
         using var bmp = new Bitmap(32, 32);
         using var g = Graphics.FromImage(bmp);
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        using var bgBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
-            new System.Drawing.Rectangle(0, 0, 32, 32),
-            System.Drawing.Color.FromArgb(14, 165, 233),
-            System.Drawing.Color.FromArgb(37, 99, 235),
-            45f);
+        using var bgBrush = new SolidBrush(System.Drawing.Color.FromArgb(22, 163, 74));
         g.FillEllipse(bgBrush, 1, 1, 30, 30);
 
         using var pen = new System.Drawing.Pen(System.Drawing.Color.White, 2.2f);
@@ -136,6 +130,30 @@ public partial class MainWindow : Window
 
         nint hIcon = bmp.GetHicon();
         return System.Drawing.Icon.FromHandle(hIcon);
+    }
+
+    private void BtnNav_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button btn || !int.TryParse(btn.Tag?.ToString(), out int tabIndex))
+            return;
+
+        PageStream.Visibility = tabIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
+        PageConnect.Visibility = tabIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+        PageSettings.Visibility = tabIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
+        PageStatus.Visibility = tabIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
+
+        var activeBg = new SolidColorBrush(MediaColor.FromRgb(26, 34, 51));
+        var activeFg = new SolidColorBrush(MediaColor.FromRgb(255, 255, 255));
+        var inactiveBg = System.Windows.Media.Brushes.Transparent;
+        var inactiveFg = new SolidColorBrush(MediaColor.FromRgb(148, 163, 184));
+
+        System.Windows.Controls.Button[] navs = [BtnNavStream, BtnNavConnect, BtnNavSettings, BtnNavStatus];
+        for (int i = 0; i < navs.Length; i++)
+        {
+            bool active = i == tabIndex;
+            navs[i].Background = active ? activeBg : inactiveBg;
+            navs[i].Foreground = active ? activeFg : inactiveFg;
+        }
     }
 
     private void BtnLangToggle_Click(object sender, RoutedEventArgs e)
@@ -151,22 +169,40 @@ public partial class MainWindow : Window
         TxtLangCode.Text = _lang == AppLanguage.Vi ? "VI" : "EN";
         TxtTitleTag.Text = S("TitleTag");
         TxtHideToTray.Text = S("HideTray");
-        TxtFirewallOpenBtn.Text = S("BtnFirewallOpen");
-        TxtFirewallCloseBtn.Text = S("BtnFirewallClose");
-        TxtHeroTitle.Text = S("HeroTitle");
-        TxtHeroSub.Text = S("HeroSub");
-        TxtSectionConfig.Text = S("SectionConfig");
+
+        TxtNavStream.Text = S("NavStream");
+        TxtNavConnect.Text = S("NavConnect");
+        TxtNavSettings.Text = S("NavSettings");
+        TxtNavStatus.Text = S("NavStatus");
+
+        TxtStreamTitle.Text = S("StreamTitle");
+        TxtStreamSub.Text = S("StreamSub");
         TxtTargetMonitor.Text = S("TargetMonitor");
         BtnRefreshMonitors.Content = S("Refresh");
         TxtFpsLabel.Text = S("FpsLabel");
         TxtBitrateLabel.Text = S("BitrateLabel");
         TxtEncoderLabel.Text = S("EncoderLabel");
-        ChkAutoRes.Content = S("AutoRes");
-        ChkMinimizeToTrayOnClose.Content = S("MinimizeToTray");
-        TxtSectionConnect.Text = S("SectionConnect");
+
+        TxtConnectTitle.Text = S("ConnectTitle");
+        TxtConnectSub.Text = S("ConnectSub");
+        BtnRotatePin.Content = S("RotatePin");
         TxtUsbTitle.Text = S("UsbTitle");
         TxtWifiTitle.Text = S("WifiTitle");
         TxtWifiHint.Text = S("WifiHint");
+        TxtRadminTitle.Text = S("RadminTitle");
+
+        TxtSettingsTitle.Text = S("SettingsTitle");
+        TxtSettingsSub.Text = S("SettingsSub");
+        TxtFwSection.Text = S("FwSection");
+        TxtFwDesc.Text = S("FwDesc");
+        BtnFirewallOpen.Content = S("BtnFirewallOpen");
+        BtnFirewallClose.Content = S("BtnFirewallClose");
+        ChkAutoRes.Content = S("AutoRes");
+        ChkMinimizeToTrayOnClose.Content = S("MinimizeToTray");
+        TxtLangSection.Text = S("LangSection");
+
+        TxtStatusTitle.Text = S("StatusTitle");
+        TxtStatusSub.Text = S("StatusSub");
         TxtStatClientsLabel.Text = S("StatClientsLabel");
 
         if (_trayOpenItem is not null) _trayOpenItem.Text = S("TrayOpen");
@@ -219,6 +255,13 @@ public partial class MainWindow : Window
     private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
 
+    private void BtnRotatePin_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isStreaming) return;
+        _accessPin = GeneratePin();
+        InitializeNetworkPreview();
+    }
+
     private void InitializeNetworkPreview()
     {
         var lanIps = SelfSignedCertGenerator.GetLocalIPv4Addresses();
@@ -236,16 +279,19 @@ public partial class MainWindow : Window
             : $"http://localhost:{_httpPort}/?token={_accessPin}";
         TxtLanUrl.Text = lanUrl;
         TxtAccessPin.Text = $"PIN: {_accessPin}";
+        TxtSidebarPin.Text = _accessPin;
         ImgQrCode.Source = GenerateQrBitmap(lanUrl);
 
         var vpnIp = SelfSignedCertGenerator.GetRadminOrVpnIPv4Address();
         if (vpnIp is not null)
         {
             TxtVpnUrl.Text = $"https://{vpnIp}:{_httpsPort}/?token={_accessPin}";
+            TxtRadminHint.Text = vpnIp.ToString();
             PanelRadmin.Visibility = Visibility.Visible;
         }
         else
         {
+            TxtRadminHint.Text = AppStrings.Get(_lang, "RadminNone");
             PanelRadmin.Visibility = Visibility.Collapsed;
         }
     }
@@ -614,6 +660,7 @@ public partial class MainWindow : Window
         CmbBitrate.IsEnabled = enabled;
         CmbEncoder.IsEnabled = enabled;
         ChkAutoRes.IsEnabled = enabled;
+        BtnRotatePin.IsEnabled = enabled;
     }
 
     private void ShowError(string message)
