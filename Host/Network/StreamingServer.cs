@@ -239,18 +239,19 @@ public sealed class StreamingServer : IAsyncDisposable
         public Guid Id { get; }
         public WebSocket Socket { get; }
 
-        private readonly Channel<(byte[] Data, WebSocketMessageType Type, bool IsKeyframe)> _channel;
+        private readonly Channel<(byte[] Data, WebSocketMessageType Type)> _channel;
         private readonly CancellationTokenSource _cts = new();
+        private volatile bool _waitingForKeyframe = true;
 
         public ClientSession(Guid id, WebSocket socket)
         {
             Id = id;
             Socket = socket;
-            // Small bounded queue so stale frames drop immediately instead of building lag
-            _channel = Channel.CreateBounded<(byte[], WebSocketMessageType, bool)>(
-                new BoundedChannelOptions(4)
+            // Wait mode + TryWrite check: if full, drop until next IDR keyframe so H.264 reference chain never breaks
+            _channel = Channel.CreateBounded<(byte[], WebSocketMessageType)>(
+                new BoundedChannelOptions(24)
                 {
-                    FullMode = BoundedChannelFullMode.DropOldest,
+                    FullMode = BoundedChannelFullMode.Wait,
                     SingleReader = true,
                     SingleWriter = false
                 });
@@ -258,13 +259,32 @@ public sealed class StreamingServer : IAsyncDisposable
 
         public void EnqueueVideo(byte[] packet, bool isKeyframe)
         {
-            _channel.Writer.TryWrite((packet, WebSocketMessageType.Binary, isKeyframe));
+            if (isKeyframe)
+            {
+                _waitingForKeyframe = false;
+                if (!_channel.Writer.TryWrite((packet, WebSocketMessageType.Binary)))
+                {
+                    // Drain stale frames and push the fresh keyframe
+                    while (_channel.Reader.TryRead(out _)) { }
+                    _channel.Writer.TryWrite((packet, WebSocketMessageType.Binary));
+                }
+                return;
+            }
+
+            if (_waitingForKeyframe)
+                return;
+
+            if (!_channel.Writer.TryWrite((packet, WebSocketMessageType.Binary)))
+            {
+                // Never drop a single P-frame silently (would corrupt H.264 GOP); wait for next keyframe
+                _waitingForKeyframe = true;
+            }
         }
 
         public void EnqueueText(string json)
         {
             byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
-            _channel.Writer.TryWrite((bytes, WebSocketMessageType.Text, false));
+            _channel.Writer.TryWrite((bytes, WebSocketMessageType.Text));
         }
 
         public async Task RunSendLoopAsync()

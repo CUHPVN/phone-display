@@ -347,8 +347,11 @@
       return;
     }
 
-    // Drop delta frames if decoder queue backs up to keep zero-buffer latency
-    if (decoder.decodeQueueSize > 2 && !isKeyframe) {
+    // Never drop a single P-frame mid-GOP (would corrupt H.264 reference frames).
+    // If decoder falls far behind, reset cleanly and wait for the next IDR keyframe.
+    if (decoder.decodeQueueSize > 8 && !isKeyframe) {
+      waitingForKeyframe = true;
+      sendControl({ type: "keyframe" });
       return;
     }
 

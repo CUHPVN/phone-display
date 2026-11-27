@@ -189,7 +189,7 @@ public sealed class VideoEncoder : IDisposable
     private static string BuildNvencArgs(int w, int h, int fps, int kbps)
     {
         int bufSize = Math.Max(kbps / 4, 500);
-        int gop = fps * 2;
+        int gop = fps;
         return $"-hide_banner -loglevel warning -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -flush_packets 1 -max_delay 0 " +
                $"-f rawvideo -pix_fmt bgra -s {w}x{h} -r {fps} -i pipe:0 " +
                $"-sws_flags fast_bilinear -c:v h264_nvenc -preset p1 -tune ull -zerolatency 1 -delay 0 -profile:v baseline " +
@@ -200,7 +200,7 @@ public sealed class VideoEncoder : IDisposable
     private static string BuildX264Args(int w, int h, int fps, int kbps)
     {
         int bufSize = Math.Max(kbps / 4, 500);
-        int gop = fps * 2;
+        int gop = fps;
         return $"-hide_banner -loglevel warning -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -flush_packets 1 -max_delay 0 " +
                $"-f rawvideo -pix_fmt bgra -s {w}x{h} -r {fps} -i pipe:0 " +
                $"-sws_flags fast_bilinear -c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline " +
