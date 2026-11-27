@@ -89,12 +89,13 @@ public sealed class StreamingServer : IAsyncDisposable
             return;
         }
 
-        // Security: allow only 1 active device at a time
-        if (_clients.Count >= 1)
+        // Replace any previous session when a valid PIN is provided (prevents stale tab lockouts)
+        foreach (var existing in _clients.Values)
         {
-            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            return;
+            existing.Complete();
+            existing.AbortSocket();
         }
+        _clients.Clear();
 
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
         var session = new ClientSession(Guid.NewGuid(), ws);

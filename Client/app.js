@@ -169,11 +169,25 @@
     }
   });
 
-  function initDecoder(codec = "avc1.42E033") {
+  async function initDecoder(codec = "avc1.42E033") {
     closeDecoder();
     if (!hasWebCodecs) {
       showToast("WebCodecs unsupported here. Use HTTPS or USB localhost.", 5000);
       return;
+    }
+
+    let hwAccel = "prefer-hardware";
+    try {
+      const support = await VideoDecoder.isConfigSupported({
+        codec,
+        hardwareAcceleration: "prefer-hardware",
+        optimizeForLatency: true
+      });
+      if (!support.supported) {
+        hwAccel = "no-preference";
+      }
+    } catch {
+      hwAccel = "no-preference";
     }
 
     waitingForKeyframe = true;
@@ -216,7 +230,7 @@
 
     decoder.configure({
       codec,
-      hardwareAcceleration: "prefer-hardware",
+      hardwareAcceleration: hwAccel,
       optimizeForLatency: true
     });
   }
@@ -245,9 +259,9 @@
     ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
 
-    ws.onopen = () => {
+    ws.onopen = async () => {
       showToast("Connected", 1200);
-      initDecoder();
+      await initDecoder();
 
       const dpr = window.devicePixelRatio || 1;
       const physW = Math.round(Math.max(window.screen.width, window.screen.height) * dpr);
@@ -407,9 +421,38 @@
 
   let lastMoveSentAt = 0;
 
+  canvas.addEventListener("contextmenu", (e) => {
+    if (isRunning) e.preventDefault();
+  });
+
+  canvas.addEventListener("wheel", (e) => {
+    if (!isRunning || inputMode === "view") return;
+    e.preventDefault();
+    sendControl({
+      type: "input",
+      action: "scroll",
+      wheelX: -e.deltaX / 100,
+      wheelY: -e.deltaY / 100
+    });
+  }, { passive: false });
+
   canvas.addEventListener("pointerdown", (e) => {
     if (!isRunning || inputMode === "view") return;
     e.preventDefault();
+
+    // Direct mouse support for PC browsers
+    if (e.pointerType === "mouse") {
+      const norm = clientToNormalized(e.clientX, e.clientY);
+      if (e.button === 2) {
+        sendControl({ type: "input", action: "rightclick", x: norm.x, y: norm.y });
+      } else if (e.button === 0) {
+        canvas.setPointerCapture(e.pointerId);
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, isMouse: true });
+        sendControl({ type: "input", action: "down", x: norm.x, y: norm.y });
+      }
+      return;
+    }
+
     canvas.setPointerCapture(e.pointerId);
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -476,7 +519,19 @@
   });
 
   canvas.addEventListener("pointermove", (e) => {
-    if (!isRunning || inputMode === "view" || !activePointers.has(e.pointerId)) return;
+    if (!isRunning || inputMode === "view") return;
+
+    // Direct mouse hover & drag on PC browsers
+    if (e.pointerType === "mouse") {
+      const now = performance.now();
+      if (now - lastMoveSentAt < 6) return;
+      lastMoveSentAt = now;
+      const norm = clientToNormalized(e.clientX, e.clientY);
+      sendControl({ type: "input", action: "move", x: norm.x, y: norm.y });
+      return;
+    }
+
+    if (!activePointers.has(e.pointerId)) return;
     e.preventDefault();
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -540,6 +595,15 @@
   });
 
   function handlePointerEnd(e) {
+    if (e.pointerType === "mouse") {
+      if (activePointers.has(e.pointerId)) {
+        activePointers.delete(e.pointerId);
+        const norm = clientToNormalized(e.clientX, e.clientY);
+        sendControl({ type: "input", action: "up", x: norm.x, y: norm.y });
+      }
+      return;
+    }
+
     if (!activePointers.has(e.pointerId)) return;
     activePointers.delete(e.pointerId);
     clearLongPress();
