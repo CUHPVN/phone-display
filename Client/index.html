@@ -25,8 +25,8 @@
         </p>
 
         <div id="insecure-banner" class="warning-banner hidden">
-          <strong>WebCodecs requires HTTPS over Wi-Fi</strong>
-          <p>Switch to the secure port or connect via USB ADB (<code>http://localhost:8080</code>).</p>
+          <strong id="txt-insecure-title">WebCodecs requires HTTPS over Wi-Fi</strong>
+          <p id="txt-insecure-desc">Switch to the secure port or connect via USB ADB (<code>http://localhost:8080</code>).</p>
           <button id="btn-switch-https" class="btn-secondary">Switch to HTTPS (:8443)</button>
         </div>
 
@@ -40,11 +40,11 @@
         </button>
 
         <div class="hints">
-          <span>Fullscreen</span>
+          <span id="txt-hint-1">Fullscreen</span>
           <span>•</span>
-          <span>Landscape Lock</span>
+          <span id="txt-hint-2">Landscape Lock</span>
           <span>•</span>
-          <span>Wake Lock</span>
+          <span id="txt-hint-3">Wake Lock</span>
         </div>
       </div>
     </div>
@@ -80,6 +80,6 @@
     <div id="toast" class="toast hidden">Connecting...</div>
   </div>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

@@ -29,6 +29,11 @@
 
   const btnWebLang = document.getElementById("btn-web-lang");
   const txtWebSubtitle = document.getElementById("txt-web-subtitle");
+  const txtInsecureTitle = document.getElementById("txt-insecure-title");
+  const txtInsecureDesc = document.getElementById("txt-insecure-desc");
+  const txtHint1 = document.getElementById("txt-hint-1");
+  const txtHint2 = document.getElementById("txt-hint-2");
+  const txtHint3 = document.getElementById("txt-hint-3");
   const pinBox = document.getElementById("pin-box");
   const inputPin = document.getElementById("input-pin");
   const urlToken = new URLSearchParams(window.location.search).get("token") || "";
@@ -38,18 +43,84 @@
   }
   let webLang = navigator.language && navigator.language.toLowerCase().startsWith("vi") ? "vi" : "en";
 
-  function applyWebLang() {
-    if (webLang === "vi") {
-      txtWebSubtitle.textContent = "Biến điện thoại Android thành màn hình phụ Windows 11 giải mã phần cứng, không cần cài app.";
-      btnStart.textContent = "Bắt đầu màn hình phụ";
-      btnWebLang.textContent = "VI";
-    } else {
-      txtWebSubtitle.textContent = "Turn your Android phone into a hardware-decoded extended Windows 11 monitor with zero app installation.";
-      btnStart.textContent = "Start Extended Display";
-      btnWebLang.textContent = "EN";
+  const WEB_STRINGS = {
+    vi: {
+      subtitle: "Biến điện thoại thành màn hình phụ Windows 11 giải mã phần cứng, không cần cài app.",
+      start: "Bắt đầu màn hình phụ",
+      pinPlaceholder: "Mã PIN (6 số)",
+      insecureTitle: "WebCodecs cần HTTPS khi dùng qua Wi-Fi",
+      insecureDesc: "Chuyển sang cổng HTTPS hoặc cắm cáp USB ADB (http://localhost:8080).",
+      switchHttps: "Chuyển sang HTTPS (:8443)",
+      hint1: "Toàn màn hình",
+      hint2: "Khóa xoay ngang",
+      hint3: "Giữ sáng màn",
+      connecting: "Đang kết nối...",
+      connected: "Đã kết nối",
+      reconnecting: "Đang kết nối lại...",
+      rejected: "Kết nối bị từ chối — kiểm tra mã PIN hoặc Firewall",
+      kbdOn: "Bàn phím: BẬT",
+      kbdOff: "Bàn phím: TẮT",
+      kbdBtnOn: "⌨ Bật",
+      kbdBtnOff: "⌨ Tắt",
+      modeView: "Chỉ xem",
+      modeTrackpad: "Trackpad",
+      modeTouch: "Chạm",
+      hintView: "Chỉ xem (Đã khóa cảm ứng)",
+      hintTrackpad: "Trackpad (1 ngón rê, chạm=click, 2 ngón=cuộn/chuột phải)",
+      hintTouch: "Chạm trực tiếp (Giữ 1 ngón + chạm ngón 2 = chuột phải)",
+      fpsToast: "Tần số quét",
+      bitrateToast: "Chất lượng"
+    },
+    en: {
+      subtitle: "Turn your device into a hardware-decoded extended Windows 11 monitor with zero app installation.",
+      start: "Start Extended Display",
+      pinPlaceholder: "PIN (6 digits)",
+      insecureTitle: "WebCodecs requires HTTPS over Wi-Fi",
+      insecureDesc: "Switch to the secure port or connect via USB ADB (http://localhost:8080).",
+      switchHttps: "Switch to HTTPS (:8443)",
+      hint1: "Fullscreen",
+      hint2: "Landscape Lock",
+      hint3: "Wake Lock",
+      connecting: "Connecting...",
+      connected: "Connected",
+      reconnecting: "Reconnecting...",
+      rejected: "Connection rejected — check PIN or Firewall",
+      kbdOn: "Keyboard ON",
+      kbdOff: "Keyboard OFF",
+      kbdBtnOn: "⌨ On",
+      kbdBtnOff: "⌨ Off",
+      modeView: "View Only",
+      modeTrackpad: "Trackpad",
+      modeTouch: "Touch",
+      hintView: "View Only (Input locked)",
+      hintTrackpad: "Trackpad (1-finger move, tap=click, 2-finger=scroll/right)",
+      hintTouch: "Touch (Hold 1st finger + tap 2nd finger = right-click)",
+      fpsToast: "Target FPS",
+      bitrateToast: "Bitrate"
     }
+  };
+
+  function t(key) {
+    return (WEB_STRINGS[webLang] && WEB_STRINGS[webLang][key]) || WEB_STRINGS.en[key] || key;
   }
-  applyWebLang();
+
+  function applyWebLang() {
+    txtWebSubtitle.textContent = t("subtitle");
+    btnStart.textContent = t("start");
+    inputPin.placeholder = t("pinPlaceholder");
+    txtInsecureTitle.textContent = t("insecureTitle");
+    txtInsecureDesc.textContent = t("insecureDesc");
+    btnSwitchHttps.textContent = t("switchHttps");
+    txtHint1.textContent = t("hint1");
+    txtHint2.textContent = t("hint2");
+    txtHint3.textContent = t("hint3");
+    btnWebLang.textContent = webLang === "vi" ? "VI" : "EN";
+
+    const modeLabels = { view: t("modeView"), trackpad: t("modeTrackpad"), touch: t("modeTouch") };
+    btnMode.textContent = modeLabels[inputMode] || t("modeView");
+    btnKeyboard.textContent = isMobileKeyboardOpen ? t("kbdBtnOn") : t("kbdBtnOff");
+  }
+
   btnWebLang.addEventListener("click", () => {
     webLang = webLang === "vi" ? "en" : "vi";
     applyWebLang();
@@ -83,6 +154,8 @@
   const inputModes = ["view", "trackpad", "touch"];
   let inputModeIndex = 0;
   let inputMode = "view"; // "view" | "trackpad" | "touch"
+  let isMobileKeyboardOpen = false;
+  applyWebLang();
   const fpsPresets = [60, 90, 120];
   let fpsPresetIndex = 0;
   const bitratePresets = [8000, 12000, 20000, 30000];
@@ -257,14 +330,14 @@
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     const token = encodeURIComponent((inputPin.value || urlToken || "").trim());
     const wsUrl = `${proto}//${window.location.host}/ws?token=${token}`;
-    showToast("Connecting...", 0);
+    showToast(t("connecting"), 0);
 
     ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
 
     ws.onopen = async () => {
       hasConnectedOnce = true;
-      showToast("Connected", 1200);
+      showToast(t("connected"), 1200);
       await initDecoder();
 
       const dpr = window.devicePixelRatio || 1;
@@ -299,9 +372,9 @@
       closeDecoder();
       if (isRunning) {
         if (ev.code === 1006 && !hasConnectedOnce) {
-          showToast("Connection rejected — check PIN / ?token= or Firewall", 3500);
+          showToast(t("rejected"), 3500);
         } else {
-          showToast("Reconnecting...", 0);
+          showToast(t("reconnecting"), 0);
         }
         reconnectTimer = setTimeout(connectWebSocket, 1200);
       }
@@ -776,14 +849,14 @@
     inputModeIndex = (inputModeIndex + 1) % inputModes.length;
     inputMode = inputModes[inputModeIndex];
     const labels = {
-      trackpad: "Trackpad",
-      touch: "Touch",
-      view: "View Only"
+      trackpad: t("modeTrackpad"),
+      touch: t("modeTouch"),
+      view: t("modeView")
     };
     const hints = {
-      trackpad: "Trackpad (1-finger move, tap=click, 2x-drag, 2-finger=scroll/right)",
-      touch: "Touch (Direct tap & drag)",
-      view: "View Only (Input locked)"
+      trackpad: t("hintTrackpad"),
+      touch: t("hintTouch"),
+      view: t("hintView")
     };
     btnMode.textContent = labels[inputMode];
     btnMode.classList.toggle("active", inputMode !== "view");
@@ -792,7 +865,6 @@
 
   // --- Keyboard Support (PC physical keyboard + Mobile soft keyboard button) ---
   let isComposing = false;
-  let isMobileKeyboardOpen = false;
   const KBD_SENTINEL = " ";
 
   function resetMobileKbdInput() {
@@ -802,7 +874,7 @@
 
   function setMobileKeyboardUi(open) {
     isMobileKeyboardOpen = open;
-    btnKeyboard.textContent = open ? "⌨ On" : "⌨ Off";
+    btnKeyboard.textContent = open ? t("kbdBtnOn") : t("kbdBtnOff");
     btnKeyboard.classList.toggle("active", open);
   }
 
@@ -823,21 +895,21 @@
     if (kbdWasOpenOnDown) {
       mobileKbdInput.blur();
       setMobileKeyboardUi(false);
-      showToast("Keyboard OFF", 1200);
+      showToast(t("kbdOff"), 1200);
       return;
     }
 
     if (inputMode === "view") {
       inputModeIndex = 1;
       inputMode = "trackpad";
-      btnMode.textContent = "Trackpad";
+      btnMode.textContent = t("modeTrackpad");
       btnMode.classList.add("active");
     }
 
     resetMobileKbdInput();
     mobileKbdInput.focus({ preventScroll: true });
     setMobileKeyboardUi(true);
-    showToast("Keyboard ON", 1200);
+    showToast(t("kbdOn"), 1200);
   });
 
   mobileKbdInput.addEventListener("blur", () => {
@@ -920,7 +992,7 @@
     const fps = fpsPresets[fpsPresetIndex];
     btnFps.textContent = `${fps} FPS`;
     sendControl({ type: "config", fps });
-    showToast(`Target FPS: ${fps}`);
+    showToast(`${t("fpsToast")}: ${fps}`);
   });
 
   btnBitrate.addEventListener("click", (e) => {
@@ -929,7 +1001,7 @@
     const kbps = bitratePresets[bitratePresetIndex];
     btnBitrate.textContent = `${Math.round(kbps / 1000)}M`;
     sendControl({ type: "config", bitrateKbps: kbps });
-    showToast(`Bitrate: ${Math.round(kbps / 1000)} Mbps`);
+    showToast(`${t("bitrateToast")}: ${Math.round(kbps / 1000)} Mbps`);
   });
 
   btnStats.addEventListener("click", (e) => {
