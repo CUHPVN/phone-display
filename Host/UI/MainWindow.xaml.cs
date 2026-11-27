@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using PhoneDisplay.Host.Capture;
@@ -71,7 +72,13 @@ public partial class MainWindow : Window
         _toastTimer.Tick += (_, _) =>
         {
             _toastTimer.Stop();
-            ToastBanner.Visibility = Visibility.Collapsed;
+            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(200));
+            fadeOut.Completed += (_, _) =>
+            {
+                if (!_toastTimer.IsEnabled)
+                    ToastBanner.Visibility = Visibility.Collapsed;
+            };
+            ToastBanner.BeginAnimation(OpacityProperty, fadeOut);
         };
     }
 
@@ -81,10 +88,23 @@ public partial class MainWindow : Window
         ToastDot.Fill = new SolidColorBrush(isWarning
             ? MediaColor.FromRgb(251, 191, 36)
             : MediaColor.FromRgb(74, 222, 128));
+        ToastBanner.Background = new SolidColorBrush(isWarning
+            ? MediaColor.FromRgb(45, 31, 11)
+            : MediaColor.FromRgb(17, 42, 29));
         ToastBanner.BorderBrush = new SolidColorBrush(isWarning
-            ? MediaColor.FromRgb(217, 119, 6)
-            : MediaColor.FromRgb(37, 99, 235));
+            ? MediaColor.FromRgb(245, 158, 11)
+            : MediaColor.FromRgb(34, 197, 94));
+
+        ToastBanner.BeginAnimation(OpacityProperty, null);
+        ToastBanner.Opacity = 0;
         ToastBanner.Visibility = Visibility.Visible;
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        ToastBanner.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
+        ToastTranslate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(16, 0, TimeSpan.FromMilliseconds(200)) { EasingFunction = ease });
+        ToastScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.94, 1.0, TimeSpan.FromMilliseconds(200)) { EasingFunction = ease });
+        ToastScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.94, 1.0, TimeSpan.FromMilliseconds(200)) { EasingFunction = ease });
+
         _toastTimer.Stop();
         _toastTimer.Start();
     }
