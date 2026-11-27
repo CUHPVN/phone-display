@@ -440,20 +440,36 @@
     if (!isRunning || inputMode === "view") return;
     e.preventDefault();
 
-    // Direct mouse support for PC browsers
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+
+    // Mouse / Laptop Touchpad on PC browsers
     if (e.pointerType === "mouse") {
-      const norm = clientToNormalized(e.clientX, e.clientY);
-      if (e.button === 2) {
-        sendControl({ type: "input", action: "rightclick", x: norm.x, y: norm.y });
-      } else if (e.button === 0) {
-        canvas.setPointerCapture(e.pointerId);
-        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, isMouse: true });
-        sendControl({ type: "input", action: "down", x: norm.x, y: norm.y });
+      if (inputMode === "trackpad") {
+        // In Trackpad mode on PC, left-drag moves cursor relatively, click = leftclick, right = rightclick
+        if (e.button === 2) {
+          sendControl({ type: "input", action: "trackpad_rightclick" });
+        } else if (e.button === 0) {
+          activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, isMouse: true });
+          gestureState.mode = "single";
+          gestureState.startX = e.clientX;
+          gestureState.startY = e.clientY;
+          gestureState.lastX = e.clientX;
+          gestureState.lastY = e.clientY;
+          gestureState.startTime = performance.now();
+          gestureState.moved = false;
+        }
+      } else {
+        const norm = clientToNormalized(e.clientX, e.clientY);
+        if (e.button === 2) {
+          sendControl({ type: "input", action: "rightclick", x: norm.x, y: norm.y });
+        } else if (e.button === 0) {
+          activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, isMouse: true });
+          sendControl({ type: "input", action: "down", x: norm.x, y: norm.y });
+        }
       }
       return;
     }
 
-    canvas.setPointerCapture(e.pointerId);
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (activePointers.size === 1) {
@@ -521,13 +537,34 @@
   canvas.addEventListener("pointermove", (e) => {
     if (!isRunning || inputMode === "view") return;
 
-    // Direct mouse hover & drag on PC browsers
+    // Mouse / Laptop Touchpad on PC browsers
     if (e.pointerType === "mouse") {
       const now = performance.now();
       if (now - lastMoveSentAt < 6) return;
       lastMoveSentAt = now;
-      const norm = clientToNormalized(e.clientX, e.clientY);
-      sendControl({ type: "input", action: "move", x: norm.x, y: norm.y });
+
+      if (inputMode === "trackpad") {
+        if (!activePointers.has(e.pointerId)) return;
+        const dx = e.clientX - gestureState.lastX;
+        const dy = e.clientY - gestureState.lastY;
+        if (Math.hypot(e.clientX - gestureState.startX, e.clientY - gestureState.startY) > 4) {
+          gestureState.moved = true;
+        }
+        trackpadSubPixelX += dx * 1.6;
+        trackpadSubPixelY += dy * 1.6;
+        const sendDx = Math.trunc(trackpadSubPixelX);
+        const sendDy = Math.trunc(trackpadSubPixelY);
+        if (sendDx !== 0 || sendDy !== 0) {
+          trackpadSubPixelX -= sendDx;
+          trackpadSubPixelY -= sendDy;
+          sendControl({ type: "input", action: "trackpad_move", dx: sendDx, dy: sendDy });
+        }
+        gestureState.lastX = e.clientX;
+        gestureState.lastY = e.clientY;
+      } else {
+        const norm = clientToNormalized(e.clientX, e.clientY);
+        sendControl({ type: "input", action: "move", x: norm.x, y: norm.y });
+      }
       return;
     }
 
@@ -598,8 +635,14 @@
     if (e.pointerType === "mouse") {
       if (activePointers.has(e.pointerId)) {
         activePointers.delete(e.pointerId);
-        const norm = clientToNormalized(e.clientX, e.clientY);
-        sendControl({ type: "input", action: "up", x: norm.x, y: norm.y });
+        if (inputMode === "trackpad") {
+          if (!gestureState.moved && performance.now() - gestureState.startTime < 260) {
+            sendControl({ type: "input", action: "leftclick" });
+          }
+        } else {
+          const norm = clientToNormalized(e.clientX, e.clientY);
+          sendControl({ type: "input", action: "up", x: norm.x, y: norm.y });
+        }
       }
       return;
     }
