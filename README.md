@@ -1,7 +1,11 @@
 # PhoneDisplay
 
 **Ultra-low-latency Android Second Monitor for Windows 11 — zero mobile app installation required.**  
-**Biến điện thoại Android thành màn hình phụ độ trễ siêu thấp cho Windows 11 — không cần cài app trên điện thoại.**
+**Biến điện thoại Android thành màn hình phụ độ trễ siêu thấp cho Windows 11 — không cần cài app trên điện thoại.**  
+**Windows 11向け超低遅延Androidサブモニター — スマホ側アプリインストール不要。**  
+**Windows 11 超低延迟 Android 扩展副屏 — 无需在手机上安装任何应用。**
+
+[English](#english) | [Tiếng Việt](#tiếng-việt) | [日本語](#日本語) | [简体中文](#简体中文)
 
 ---
 
@@ -103,3 +107,88 @@ PhoneDisplay turns any Android smartphone into a responsive extended display ove
 ### Khắc phục sự cố (Troubleshooting)
 - **Không vào được `https://<IP-PC>:8443` qua Wi-Fi**: Kiểm tra 2 thiết bị có dùng chung Wi-Fi không, đổi mạng Windows sang **Private**, và chạy `.\Scripts\setup-virtual-display.ps1 -AddFirewallRules` bằng quyền Admin để mở cổng `8080` và `8443`.
 - **Lỗi `WebCodecs` trên trình duyệt**: Chrome yêu cầu kết nối bảo mật (`https://` qua Wi-Fi hoặc `http://localhost:8080` qua cáp USB ADB). Không mở `http://<IP-PC>:8080` qua Wi-Fi.
+
+---
+
+## 日本語
+
+### 概要
+**PhoneDisplay** は、Androidスマートフォンを **USBケーブル (`adb reverse`)** または **Wi-Fi LAN (`HTTPS + QRコード`)** 経由で Windows 11 の低遅延拡張モニター（セカンドディスプレイ）に変えるツールです。スマホ側のブラウザ（Chrome）の **WebCodecs** ハードウェアデコードを使用するため、**スマホアプリのインストールは不要**です。
+
+### 主な機能
+- **DXGI Desktop Duplication + GDI 初期フレーム**: GPU VRAM からゼロコピーで画面をキャプチャし、ハードウェアカーソルを合成。10-bit/HDR パネル向けの `IDXGIOutput5.DuplicateOutput1` フォールバックや、静止中の拡張モニターでも即座に描画される GDI `BitBlt` 初期フレーム取得に対応。
+- **NVIDIA NVENC ハードウェアエンコード**: `ffmpeg` (`h264_nvenc -preset p1 -tune ull -zerolatency 1 -bf 0 -rc cbr`) で超低遅延エンコードを行い、非対応環境では自動的に `libx264` へフォールバック。
+- **USB & Wi-Fi デュアル接続**:
+  - **USB 接続 (`http://localhost:8080`)**: `adb reverse tcp:8080 tcp:8080` を自動実行し、最小遅延で接続。
+  - **Wi-Fi LAN (`https://<LAN-IP>:8443`)**: VPN アダプターを除外し実 LAN IP を優先して自己署名 SAN 証明書を自動生成。Chrome で `WebCodecs`・フルスクリーン・Wake Lock が利用可能。
+- **9remote 風マルチモード操作**:
+  - **Trackpad（デフォルト）**: 1本指で加速度付きカーソル移動、タップ＝左クリック、ダブルタップ＆ホールド＝ドラッグ、長押し(450ms)または2本指タップ＝右クリック、2本指スワイプ＝スクロール。
+  - **Touch**: 画面上のタッチ位置へ直接クリック＆ドラッグ。
+  - **View Only**: 誤操作を防ぐ閲覧専用ロックモード。
+- **モダンな Windows 11 UI & システムトレイ格納**: ダークタイトルバー、リアルタイム FPS / エンコード遅延 / ビットレート表示、QR コード表示、タスクトレイ最小化＆右クリックメニュー対応。
+- **解像度自動調整**: 接続したスマホの画面比率に合わせて拡張モニターの解像度を自動変更し、終了時に元の設定へ復元。
+
+### 必要環境
+1. **Windows 11 (x64)**（.NET Desktop + ASP.NET Core Runtime）
+2. **FFmpeg**: `winget install Gyan.FFmpeg.Essentials`
+3. **Virtual Display Driver**（独立した拡張モニターを作成する場合）:
+   - `winget install VirtualDrivers.Virtual-Display-Driver` でインストール後、**VDD Control** からドライバーを導入し仮想モニターを有効化。
+   - 管理者権限の PowerShell で Android 解像度追加とファイアウォール開放を実行：
+     ```powershell
+     .\Scripts\setup-virtual-display.ps1 -AddFirewallRules
+     ```
+   - `Win + P` → **拡張 (Extend)** を選択。
+4. *(USB 接続時)* **ADB**: `winget install Google.PlatformTools`（スマホ側で USB デバッグを有効化）。
+
+### クイックスタート
+1. アプリをビルド：
+   ```powershell
+   dotnet publish Host\PhoneDisplay.Host.csproj -c Release -o App
+   ```
+2. `App\PhoneDisplay.exe` を起動し、拡張モニターを選択して **Bắt đầu phát (Start)** をクリック。
+3. Android の **Chrome** で接続：
+   - **USB**: `USB Ready` 表示後、`http://localhost:8080` を開く。
+   - **Wi-Fi**: QR コードを読み取るか `https://<PC-LAN-IP>:8443` を開き、初回のみ「詳細設定 → アクセスする」を選択後、**Start Extended Display** をタップ。
+
+---
+
+## 简体中文
+
+### 简介
+**PhoneDisplay** 可将任意 Android 手机通过 **USB 数据线 (`adb reverse`)** 或 **Wi-Fi 局域网 (`HTTPS + 二维码`)** 变为 Windows 11 的超低延迟扩展副屏。客户端直接利用手机 Chrome 浏览器的 **WebCodecs** 硬件解码，**无需在手机端安装任何 App**。
+
+### 核心特性
+- **DXGI 桌面复制 + GDI 首帧保底**: 直接从 GPU 显存零拷贝抓屏并合成硬件鼠标指针；支持 10-bit/HDR 屏幕的 `IDXGIOutput5.DuplicateOutput1` 回退，以及扩展屏静止时的 GDI `BitBlt` 首帧抓取，避免黑屏。
+- **NVIDIA NVENC 硬件编码**: 通过 `ffmpeg`（`h264_nvenc -preset p1 -tune ull -zerolatency 1 -bf 0 -rc cbr`）实现毫秒级编码，不支持 NVENC 时自动回退至 `libx264`。
+- **USB 与 Wi-Fi 双模式连接**:
+  - **USB 数据线 (`http://localhost:8080`)**: 自动检测设备并执行 `adb reverse tcp:8080 tcp:8080`，实现近乎零延迟连接。
+  - **Wi-Fi 局域网 (`https://<LAN-IP>:8443`)**: 自动过滤虚拟 VPN 网卡并优先选用真实 Wi-Fi/以太网 IP 生成自签名 SAN 证书，解锁 Chrome 的 `WebCodecs`、全屏和屏幕常亮（Wake Lock）。
+- **类 9remote 多模式触控**:
+  - **Trackpad（默认触控板模式）**: 单指相对移动（带加速度与亚像素累加）、单击＝左键、双击按住＝拖拽、长按(450ms)或双指轻点＝右键、双指滑动＝平滑滚动。
+  - **Touch（直触模式）**: 指哪点哪，直接映射屏幕绝对坐标。
+  - **View Only（仅观看模式）**: 锁定触控输入，防止误触。
+- **现代 Windows 11 界面与系统托盘**: 深色自定义标题栏、实时 FPS / 编码延迟 / 码率 / 连接数面板、二维码直连、支持最小化到系统托盘及托盘右键快捷控制。
+- **自动匹配分辨率**: 根据手机屏幕比例自动匹配扩展屏分辨率，停止或退出时自动恢复原设置。
+
+### 环境要求
+1. **Windows 11 (x64)**（已安装 .NET Runtime / SDK）。
+2. **FFmpeg**: 通过 `winget install Gyan.FFmpeg.Essentials` 安装。
+3. **虚拟显示器驱动 (Virtual Display Driver)**（用于创建独立扩展屏）:
+   - 通过 `winget install VirtualDrivers.Virtual-Display-Driver` 安装后，打开 **VDD Control** 安装驱动并启用 1 个虚拟显示器。
+   - 以管理员身份运行 PowerShell 添加常见 Android 分辨率并放行防火墙端口（`8080`、`8443`）：
+     ```powershell
+     .\Scripts\setup-virtual-display.ps1 -AddFirewallRules
+     ```
+   - 按 `Win + P` → 选择 **扩展 (Extend)**。
+4. *（可选，USB 模式需要）* **ADB**: 通过 `winget install Google.PlatformTools` 安装，并在手机开启 **USB 调试**。
+
+### 快速开始
+1. 编译发布主机端：
+   ```powershell
+   dotnet publish Host\PhoneDisplay.Host.csproj -c Release -o App
+   ```
+2. 双击运行 `App\PhoneDisplay.exe`，选择扩展显示器后点击 **Bắt đầu phát (Start)**。
+3. 在手机 **Chrome** 中连接：
+   - **USB 连接**: 等待界面显示 `USB Ready` 后访问 `http://localhost:8080`。
+   - **Wi-Fi 连接**: 扫描界面二维码（`https://<PC-LAN-IP>:8443`），首次访问点击“高级 → 继续前往”，然后点击 **Start Extended Display**。
+
