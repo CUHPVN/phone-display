@@ -40,19 +40,25 @@ public static class SelfSignedCertGenerator
                     continue;
 
                 byte[] b = unicast.Address.GetAddressBytes();
-                bool isPrivateLan = b[0] == 192 && b[1] == 168 ||
+                bool isLinkLocal = b[0] == 169 && b[1] == 254;
+                bool isPrivateLan = (b[0] == 192 && b[1] == 168) ||
                                     b[0] == 10 ||
                                     (b[0] == 172 && b[1] >= 16 && b[1] <= 31);
 
                 int priority = 100;
-                if (!isVirtual && ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && isPrivateLan)
-                    priority = 1;
-                else if (!isVirtual && ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet && isPrivateLan)
-                    priority = 2;
-                else if (!isVirtual && isPrivateLan)
-                    priority = 3;
+                if (!isVirtual && !isLinkLocal)
+                {
+                    priority = ni.NetworkInterfaceType switch
+                    {
+                        NetworkInterfaceType.Wireless80211 => isPrivateLan ? 1 : 4,
+                        NetworkInterfaceType.Ethernet => isPrivateLan ? 2 : 5,
+                        _ => isPrivateLan ? 3 : 6
+                    };
+                }
                 else if (isVirtual)
+                {
                     priority = 50;
+                }
 
                 candidates.Add((unicast.Address, priority));
             }
