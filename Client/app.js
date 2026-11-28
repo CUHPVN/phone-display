@@ -40,7 +40,14 @@
   const txtAudioOnlySub = document.getElementById("txt-audio-only-sub");
   const pinBox = document.getElementById("pin-box");
   const inputPin = document.getElementById("input-pin");
-  const urlToken = new URLSearchParams(window.location.search).get("token") || "";
+  const rawUrlToken = new URLSearchParams(window.location.search).get("token") || "";
+  if (rawUrlToken) {
+    try { sessionStorage.setItem("pd_token", rawUrlToken); } catch { /* ignore */ }
+    try { window.history.replaceState({}, document.title, window.location.pathname); } catch { /* ignore */ }
+  }
+  let storedToken = "";
+  try { storedToken = sessionStorage.getItem("pd_token") || ""; } catch { /* ignore */ }
+  const urlToken = rawUrlToken || storedToken;
   if (urlToken) {
     inputPin.value = urlToken;
     pinBox.classList.add("hidden");
@@ -61,7 +68,8 @@
       connecting: "Đang kết nối...",
       connected: "Đã kết nối",
       reconnecting: "Đang kết nối lại...",
-      rejected: "Kết nối bị từ chối — kiểm tra mã PIN hoặc Firewall",
+      rejected: "Sai mã PIN — vui lòng kiểm tra và nhập lại",
+      rateLimited: "Nhập sai PIN quá nhiều lần — tạm khóa 5 phút",
       kbdOn: "Bàn phím: BẬT",
       kbdOff: "Bàn phím: TẮT",
       kbdBtnOn: "⌨ Bật",
@@ -96,7 +104,8 @@
       connecting: "Connecting...",
       connected: "Connected",
       reconnecting: "Reconnecting...",
-      rejected: "Connection rejected — check PIN or Firewall",
+      rejected: "Invalid PIN — please check and try again",
+      rateLimited: "Too many wrong PIN attempts — locked for 5 min",
       kbdOn: "Keyboard ON",
       kbdOff: "Keyboard OFF",
       kbdBtnOn: "⌨ On",
@@ -183,12 +192,106 @@
   let isMobileKeyboardOpen = false;
   let hostVideoEnabled = true;
   let hostAllowInput = true;
+  let pendingVideoFrame = null;
+  let rafScheduled = false;
   let audioEnabled = true;
   let audioCtx = null;
   let audioGain = null;
+  let audioWorkletNode = null;
+  let useAudioWorklet = false;
   let audioNextPlayTime = 0;
   const AUDIO_TARGET_BUFFER_SEC = 0.045;
   const AUDIO_MAX_BUFFER_SEC = 0.16;
+
+  const AUDIO_WORKLET_CODE = `
+    class PcmRingProcessor extends AudioWorkletProcessor {
+      constructor() {
+        super();
+        this.capacity = 24000;
+        this.left = new Float32Array(this.capacity);
+        this.right = new Float32Array(this.capacity);
+        this.readIdx = 0;
+        this.writeIdx = 0;
+        this.available = 0;
+        this.started = false;
+        this.targetPrefill = Math.round(sampleRate * 0.020);
+        this.maxBuffered = Math.round(sampleRate * 0.100);
+        this.port.onmessage = (e) => {
+          const msg = e.data;
+          if (!msg) return;
+          if (msg.type === "reset") {
+            this.readIdx = 0;
+            this.writeIdx = 0;
+            this.available = 0;
+            this.started = false;
+            return;
+          }
+          if (!msg.buffer || msg.buffer.byteLength <= 14) return;
+          const view = new DataView(msg.buffer);
+          const pktRate = msg.sampleRate || sampleRate;
+          const ch = Math.min(2, Math.max(1, msg.channels || 2));
+          const frameCount = Math.floor((msg.buffer.byteLength - 14) / (ch * 2));
+          if (frameCount <= 0) return;
+          const ratio = pktRate / sampleRate;
+          const outCount = ratio === 1 ? frameCount : Math.max(1, Math.round(frameCount / ratio));
+          for (let i = 0; i < outCount; i++) {
+            const srcPos = ratio === 1 ? i : Math.min(frameCount - 1, Math.floor(i * ratio));
+            let l, r;
+            if (ch === 1) {
+              l = view.getInt16(14 + srcPos * 2, true) / 32768.0;
+              r = l;
+            } else {
+              const off = 14 + srcPos * 4;
+              l = view.getInt16(off, true) / 32768.0;
+              r = view.getInt16(off + 2, true) / 32768.0;
+            }
+            if (this.available >= this.capacity) {
+              this.readIdx = (this.readIdx + 1) % this.capacity;
+              this.available--;
+            }
+            this.left[this.writeIdx] = l;
+            this.right[this.writeIdx] = r;
+            this.writeIdx = (this.writeIdx + 1) % this.capacity;
+            this.available++;
+          }
+          if (this.available > this.maxBuffered) {
+            const drop = this.available - this.targetPrefill;
+            this.readIdx = (this.readIdx + drop) % this.capacity;
+            this.available -= drop;
+          }
+        };
+      }
+      process(inputs, outputs) {
+        const output = outputs[0];
+        if (!output || output.length === 0) return true;
+        const outL = output[0];
+        const outR = output[1] || output[0];
+        if (!this.started) {
+          if (this.available < this.targetPrefill) {
+            outL.fill(0);
+            if (outR !== outL) outR.fill(0);
+            return true;
+          }
+          this.started = true;
+        }
+        const n = outL.length;
+        for (let i = 0; i < n; i++) {
+          if (this.available > 0) {
+            outL[i] = this.left[this.readIdx];
+            if (outR !== outL) outR[i] = this.right[this.readIdx];
+            this.readIdx = (this.readIdx + 1) % this.capacity;
+            this.available--;
+          } else {
+            outL[i] = 0;
+            if (outR !== outL) outR[i] = 0;
+            this.started = false;
+          }
+        }
+        return true;
+      }
+    }
+    registerProcessor("pcm-ring-processor", PcmRingProcessor);
+  `;
   applyWebLang();
   const fpsPresets = [60, 90, 120];
   let fpsPresetIndex = 0;
@@ -303,35 +406,13 @@
     waitingForKeyframe = true;
     decoder = new VideoDecoder({
       output: (frame) => {
-        try {
-          if (frame.displayWidth !== videoWidth || frame.displayHeight !== videoHeight) {
-            videoWidth = frame.displayWidth;
-            videoHeight = frame.displayHeight;
-            computeDrawRect();
-            statRes.textContent = `${videoWidth}x${videoHeight}`;
-          }
-
-          if (audioOnlyBanner && !audioOnlyBanner.classList.contains("hidden")) {
-            audioOnlyBanner.classList.add("hidden");
-          }
-
-          ctx.fillStyle = "#000000";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(frame, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
-
-          decodedFramesCount++;
-          const now = performance.now();
-          if (now - lastFpsTick >= 1000) {
-            const fps = (decodedFramesCount * 1000) / (now - lastFpsTick);
-            statFps.textContent = `${fps.toFixed(0)} FPS`;
-            statEnc.textContent = `Enc ${lastEncodeLatencyMs.toFixed(1)}ms`;
-            statRtt.textContent = `RTT ${lastRttMs}ms`;
-            statEncName.textContent = activeEncoderName;
-            decodedFramesCount = 0;
-            lastFpsTick = now;
-          }
-        } finally {
-          frame.close();
+        if (pendingVideoFrame) {
+          try { pendingVideoFrame.close(); } catch { /* ignore */ }
+        }
+        pendingVideoFrame = frame;
+        if (!rafScheduled) {
+          rafScheduled = true;
+          requestAnimationFrame(renderPendingVideoFrame);
         }
       },
       error: (err) => {
@@ -349,7 +430,50 @@
     });
   }
 
+  function renderPendingVideoFrame() {
+    rafScheduled = false;
+    const frame = pendingVideoFrame;
+    pendingVideoFrame = null;
+    if (!frame) return;
+
+    try {
+      if (frame.displayWidth !== videoWidth || frame.displayHeight !== videoHeight) {
+        videoWidth = frame.displayWidth;
+        videoHeight = frame.displayHeight;
+        computeDrawRect();
+        statRes.textContent = `${videoWidth}x${videoHeight}`;
+      }
+
+      if (audioOnlyBanner && !audioOnlyBanner.classList.contains("hidden")) {
+        audioOnlyBanner.classList.add("hidden");
+      }
+
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(frame, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+
+      decodedFramesCount++;
+      const now = performance.now();
+      if (now - lastFpsTick >= 1000) {
+        const fps = (decodedFramesCount * 1000) / (now - lastFpsTick);
+        statFps.textContent = `${fps.toFixed(0)} FPS`;
+        statEnc.textContent = `Enc ${lastEncodeLatencyMs.toFixed(1)}ms`;
+        statRtt.textContent = `RTT ${lastRttMs}ms`;
+        statEncName.textContent = activeEncoderName;
+        decodedFramesCount = 0;
+        lastFpsTick = now;
+      }
+    } finally {
+      frame.close();
+    }
+  }
+
   function closeDecoder() {
+    if (pendingVideoFrame) {
+      try { pendingVideoFrame.close(); } catch { /* ignore */ }
+      pendingVideoFrame = null;
+    }
+    rafScheduled = false;
     if (decoder) {
       try {
         if (decoder.state !== "closed") decoder.close();
@@ -369,9 +493,35 @@
         audioGain.gain.value = audioEnabled ? 1.0 : 0.0;
         audioGain.connect(audioCtx.destination);
         audioNextPlayTime = 0;
+        useAudioWorklet = false;
+
+        if (audioCtx.audioWorklet) {
+          const targetCtx = audioCtx;
+          const targetGain = audioGain;
+          const blob = new Blob([AUDIO_WORKLET_CODE], { type: "application/javascript" });
+          const blobUrl = URL.createObjectURL(blob);
+          targetCtx.audioWorklet.addModule(blobUrl)
+            .then(() => {
+              URL.revokeObjectURL(blobUrl);
+              if (audioCtx !== targetCtx || targetCtx.state === "closed" || !targetGain) return;
+              audioWorkletNode = new AudioWorkletNode(targetCtx, "pcm-ring-processor", {
+                numberOfInputs: 0,
+                numberOfOutputs: 1,
+                outputChannelCount: [2]
+              });
+              audioWorkletNode.connect(targetGain);
+              useAudioWorklet = true;
+            })
+            .catch(() => {
+              URL.revokeObjectURL(blobUrl);
+              useAudioWorklet = false;
+            });
+        }
       } catch {
         audioCtx = null;
         audioGain = null;
+        audioWorkletNode = null;
+        useAudioWorklet = false;
         return;
       }
     }
@@ -383,6 +533,11 @@
 
   function closeAudioContext() {
     audioNextPlayTime = 0;
+    useAudioWorklet = false;
+    if (audioWorkletNode) {
+      try { audioWorkletNode.disconnect(); } catch { /* ignore */ }
+      audioWorkletNode = null;
+    }
     audioGain = null;
     if (audioCtx) {
       try {
@@ -406,6 +561,15 @@
     const channels = Math.min(2, Math.max(1, view.getUint8(5)));
     if (sampleRate < 8000 || sampleRate > 192000) return;
 
+    if (useAudioWorklet && audioWorkletNode) {
+      audioWorkletNode.port.postMessage({ buffer: arrayBuffer, sampleRate, channels }, [arrayBuffer]);
+      return;
+    }
+
+    handleAudioPacketFallback(arrayBuffer, view, sampleRate, channels);
+  }
+
+  function handleAudioPacketFallback(arrayBuffer, view, sampleRate, channels) {
     const pcmBytes = arrayBuffer.byteLength - 14;
     const frameCount = Math.floor(pcmBytes / (channels * 2));
     if (frameCount <= 0) return;
@@ -438,6 +602,31 @@
     audioNextPlayTime += audioBuffer.duration;
   }
 
+  async function onAuthenticated() {
+    hasConnectedOnce = true;
+    showToast(t("connected"), 1200);
+    await initDecoder();
+
+    const dpr = window.devicePixelRatio || 1;
+    const physW = Math.round(Math.max(window.screen.width, window.screen.height) * dpr);
+    const physH = Math.round(Math.min(window.screen.width, window.screen.height) * dpr);
+
+    sendControl({
+      type: "hello",
+      width: physW,
+      height: physH,
+      dpr,
+      refreshRate: fpsPresets[fpsPresetIndex]
+    });
+
+    sendControl({ type: "config", audioEnabled });
+
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => {
+      sendControl({ type: "ping", ts: Date.now() });
+    }, 2000);
+  }
+
   function connectWebSocket() {
     clearTimeout(reconnectTimer);
     if (ws) {
@@ -446,36 +635,18 @@
     }
 
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const token = encodeURIComponent((inputPin.value || urlToken || "").trim());
-    const wsUrl = `${proto}//${window.location.host}/ws?token=${token}`;
+    const token = (inputPin.value || urlToken || "").trim();
+    if (token) {
+      try { sessionStorage.setItem("pd_token", token); } catch { /* ignore */ }
+    }
+    const wsUrl = `${proto}//${window.location.host}/ws`;
     showToast(t("connecting"), 0);
 
     ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
 
-    ws.onopen = async () => {
-      hasConnectedOnce = true;
-      showToast(t("connected"), 1200);
-      await initDecoder();
-
-      const dpr = window.devicePixelRatio || 1;
-      const physW = Math.round(Math.max(window.screen.width, window.screen.height) * dpr);
-      const physH = Math.round(Math.min(window.screen.width, window.screen.height) * dpr);
-
-      sendControl({
-        type: "hello",
-        width: physW,
-        height: physH,
-        dpr,
-        refreshRate: fpsPresets[fpsPresetIndex]
-      });
-
-      sendControl({ type: "config", audioEnabled });
-
-      clearInterval(pingTimer);
-      pingTimer = setInterval(() => {
-        sendControl({ type: "ping", ts: Date.now() });
-      }, 2000);
+    ws.onopen = () => {
+      sendControl({ type: "auth", token });
     };
 
     ws.onmessage = (ev) => {
@@ -499,14 +670,32 @@
       clearInterval(pingTimer);
       closeDecoder();
       audioNextPlayTime = 0;
-      if (isRunning) {
-        if (ev.code === 1006 && !hasConnectedOnce) {
-          showToast(t("rejected"), 3500);
-        } else {
-          showToast(t("reconnecting"), 0);
-        }
-        reconnectTimer = setTimeout(connectWebSocket, 1200);
+      if (useAudioWorklet && audioWorkletNode) {
+        try { audioWorkletNode.port.postMessage({ type: "reset" }); } catch { }
       }
+      if (!isRunning) return;
+
+      if (ev.code === 4001 || ev.code === 4029) {
+        isRunning = false;
+        if (ev.code === 4001) {
+          try { sessionStorage.removeItem("pd_token"); } catch { }
+          inputPin.value = "";
+          pinBox.classList.remove("hidden");
+        }
+        miniPill.classList.add("hidden");
+        statsHud.classList.add("hidden");
+        audioOnlyBanner?.classList.add("hidden");
+        landingOverlay.classList.remove("hidden");
+        showToast(t(ev.code === 4029 ? "rateLimited" : "rejected"), 4000);
+        return;
+      }
+
+      if (ev.code === 1006 && !hasConnectedOnce) {
+        showToast(t("rejected"), 3500);
+      } else {
+        showToast(t("reconnecting"), 0);
+      }
+      reconnectTimer = setTimeout(connectWebSocket, 1200);
     };
 
     ws.onerror = () => {
@@ -517,6 +706,11 @@
   function handleServerText(text) {
     let msg;
     try { msg = JSON.parse(text); } catch { return; }
+
+    if (msg.type === "auth_ok") {
+      onAuthenticated();
+      return;
+    }
 
     if (msg.type === "info") {
       videoWidth = msg.width || videoWidth;
@@ -576,7 +770,7 @@
 
     // Never drop a single P-frame mid-GOP (would corrupt H.264 reference frames).
     // If decoder falls far behind, reset cleanly and wait for the next IDR keyframe.
-    if (decoder.decodeQueueSize > 8 && !isKeyframe) {
+    if (decoder.decodeQueueSize > 4 && !isKeyframe) {
       waitingForKeyframe = true;
       sendControl({ type: "keyframe" });
       return;
@@ -1159,9 +1353,17 @@
       if (audioGain && audioCtx) {
         audioGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
       }
+      if (useAudioWorklet && audioWorkletNode) {
+        try { audioWorkletNode.port.postMessage({ type: "reset" }); } catch { }
+      }
       audioNextPlayTime = 0;
-    } else if (audioGain && audioCtx) {
-      audioGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+    } else {
+      if (audioGain && audioCtx) {
+        audioGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+      }
+      if (useAudioWorklet && audioWorkletNode) {
+        try { audioWorkletNode.port.postMessage({ type: "reset" }); } catch { }
+      }
     }
 
     btnAudio.textContent = audioEnabled ? t("audioBtnOn") : t("audioBtnOff");

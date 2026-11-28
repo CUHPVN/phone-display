@@ -29,6 +29,9 @@ public sealed class ClientMessage
     [JsonPropertyName("audioEnabled")]
     public bool? AudioEnabled { get; set; }
 
+    [JsonPropertyName("token")]
+    public string? Token { get; set; }
+
     [JsonPropertyName("ts")]
     public long TimestampMs { get; set; }
 

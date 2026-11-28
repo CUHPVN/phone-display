@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
@@ -20,9 +21,17 @@ public sealed class StreamingServer : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly ConcurrentDictionary<Guid, ClientSession> _clients = new();
+    private readonly ConcurrentDictionary<string, AuthAttemptState> _authAttempts = new();
     private readonly InputInjector _inputInjector;
     private readonly string _accessToken;
     private volatile bool _isStopping;
+
+    private sealed class AuthAttemptState
+    {
+        public int Failures;
+        public DateTime WindowStartUtc;
+        public DateTime LockedUntilUtc;
+    }
 
     public int ConnectedClientCount => _clients.Count;
     public volatile bool AllowRemoteInput = true;
@@ -46,7 +55,7 @@ public sealed class StreamingServer : IAsyncDisposable
 
         builder.WebHost.ConfigureKestrel(options =>
         {
-            options.Listen(IPAddress.Any, config.HttpPort);
+            options.Listen(IPAddress.Loopback, config.HttpPort);
             options.Listen(IPAddress.Any, config.HttpsPort, listenOpts =>
             {
                 listenOpts.UseHttps(lanCert);
@@ -54,6 +63,16 @@ public sealed class StreamingServer : IAsyncDisposable
         });
 
         _app = builder.Build();
+        _app.Use(async (context, next) =>
+        {
+            var headers = context.Response.Headers;
+            headers["X-Content-Type-Options"] = "nosniff";
+            headers["X-Frame-Options"] = "DENY";
+            headers["Referrer-Policy"] = "no-referrer";
+            headers["Content-Security-Policy"] =
+                "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; worker-src 'self' blob:";
+            await next();
+        });
         _app.UseWebSockets(new WebSocketOptions
         {
             KeepAliveInterval = TimeSpan.FromSeconds(10)
@@ -88,14 +107,63 @@ public sealed class StreamingServer : IAsyncDisposable
             return;
         }
 
-        string? providedToken = context.Request.Query["token"];
-        if (!string.IsNullOrEmpty(_accessToken) && !string.Equals(providedToken, _accessToken, StringComparison.Ordinal))
+        string? originHeader = context.Request.Headers.Origin.ToString();
+        if (!string.IsNullOrEmpty(originHeader))
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            if (!Uri.TryCreate(originHeader, UriKind.Absolute, out Uri? originUri) ||
+                !string.Equals(originUri.Host, context.Request.Host.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+        }
+
+        string remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (IsIpRateLimited(remoteIp, out int retryAfterSec))
+        {
+            context.Response.Headers["Retry-After"] = retryAfterSec.ToString();
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
             return;
         }
 
-        // Replace any previous session when a valid PIN is provided (prevents stale tab lockouts)
+        string? queryToken = context.Request.Query["token"];
+        if (!string.IsNullOrEmpty(queryToken))
+        {
+            if (!string.IsNullOrEmpty(_accessToken) && !ConstantTimeEquals(queryToken, _accessToken))
+            {
+                RecordAuthFailure(remoteIp);
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+            ClearAuthFailures(remoteIp);
+        }
+
+        using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
+
+        if (string.IsNullOrEmpty(queryToken) && !string.IsNullOrEmpty(_accessToken))
+        {
+            using var authCts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            string? authToken = await ReceiveAuthTokenAsync(ws, authCts.Token);
+            if (authToken is null || !ConstantTimeEquals(authToken, _accessToken))
+            {
+                bool nowLocked = RecordAuthFailure(remoteIp);
+                try
+                {
+                    await ws.CloseAsync(
+                        (WebSocketCloseStatus)(nowLocked ? 4029 : 4001),
+                        nowLocked ? "Rate limited" : "Unauthorized",
+                        CancellationToken.None);
+                }
+                catch { }
+                return;
+            }
+
+            ClearAuthFailures(remoteIp);
+            byte[] okBytes = System.Text.Encoding.UTF8.GetBytes("{\"type\":\"auth_ok\"}");
+            await ws.SendAsync(okBytes, WebSocketMessageType.Text, endOfMessage: true, CancellationToken.None);
+        }
+
+        // Replace any previous session only AFTER valid PIN authentication
         foreach (var existing in _clients.Values)
         {
             existing.Complete();
@@ -103,7 +171,6 @@ public sealed class StreamingServer : IAsyncDisposable
         }
         _clients.Clear();
 
-        using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
         var session = new ClientSession(Guid.NewGuid(), ws);
         _clients[session.Id] = session;
 
@@ -122,6 +189,85 @@ public sealed class StreamingServer : IAsyncDisposable
             session.Complete();
             try { await sendTask; } catch { }
             session.Dispose();
+        }
+    }
+
+    private bool IsIpRateLimited(string ip, out int retryAfterSec)
+    {
+        retryAfterSec = 0;
+        if (!_authAttempts.TryGetValue(ip, out var state))
+            return false;
+
+        lock (state)
+        {
+            var now = DateTime.UtcNow;
+            if (now < state.LockedUntilUtc)
+            {
+                retryAfterSec = Math.Max(1, (int)Math.Ceiling((state.LockedUntilUtc - now).TotalSeconds));
+                return true;
+            }
+            return false;
+        }
+    }
+
+    private bool RecordAuthFailure(string ip)
+    {
+        var state = _authAttempts.GetOrAdd(ip, _ => new AuthAttemptState { WindowStartUtc = DateTime.UtcNow });
+        lock (state)
+        {
+            var now = DateTime.UtcNow;
+            if ((now - state.WindowStartUtc) > TimeSpan.FromMinutes(2))
+            {
+                state.WindowStartUtc = now;
+                state.Failures = 1;
+                state.LockedUntilUtc = DateTime.MinValue;
+                return false;
+            }
+
+            state.Failures++;
+            if (state.Failures >= 5)
+            {
+                state.LockedUntilUtc = now.AddMinutes(5);
+                return true;
+            }
+            return false;
+        }
+    }
+
+    private void ClearAuthFailures(string ip) => _authAttempts.TryRemove(ip, out _);
+
+    private static bool ConstantTimeEquals(string a, string b)
+    {
+        byte[] ba = System.Text.Encoding.UTF8.GetBytes(a);
+        byte[] bb = System.Text.Encoding.UTF8.GetBytes(b);
+        return CryptographicOperations.FixedTimeEquals(ba, bb);
+    }
+
+    private static async Task<string?> ReceiveAuthTokenAsync(WebSocket ws, CancellationToken ct)
+    {
+        byte[] buf = new byte[4096];
+        using var ms = new MemoryStream();
+        try
+        {
+            while (ws.State == WebSocketState.Open)
+            {
+                WebSocketReceiveResult res = await ws.ReceiveAsync(buf, ct);
+                if (res.MessageType == WebSocketMessageType.Close)
+                    return null;
+                if (ms.Length + res.Count > 16 * 1024)
+                    return null;
+                ms.Write(buf, 0, res.Count);
+                if (res.EndOfMessage)
+                    break;
+            }
+
+            string json = System.Text.Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
+            var msg = JsonSerializer.Deserialize<ClientMessage>(json);
+            return msg is { Type: "auth" } ? msg.Token : null;
+        }
+        catch
+        {
+            return null;
         }
     }
 

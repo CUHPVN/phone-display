@@ -190,9 +190,9 @@ public sealed class VideoEncoder : IDisposable
     {
         int bufSize = Math.Max(kbps / 4, 500);
         int gop = fps;
-        return $"-hide_banner -loglevel warning -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -flush_packets 1 -max_delay 0 " +
+        return $"-hide_banner -loglevel warning -threads 2 -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -flush_packets 1 -max_delay 0 " +
                $"-f rawvideo -pix_fmt bgra -s {w}x{h} -r {fps} -i pipe:0 " +
-               $"-sws_flags fast_bilinear -c:v h264_nvenc -preset p1 -tune ull -zerolatency 1 -delay 0 -profile:v baseline " +
+               $"-sws_flags fast_bilinear -c:v h264_nvenc -preset p1 -tune ull -zerolatency 1 -delay 0 -rc-lookahead 0 -spatial-aq 0 -no-scenecut 1 -profile:v baseline " +
                $"-pix_fmt yuv420p -rc cbr -b:v {kbps}k -maxrate {kbps}k -bufsize {bufSize}k " +
                $"-g {gop} -bf 0 -forced-idr 1 -f h264 pipe:1";
     }

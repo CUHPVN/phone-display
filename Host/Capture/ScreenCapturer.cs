@@ -216,10 +216,12 @@ public sealed unsafe class ScreenCapturer : IVideoCapturer
 
             result.CheckError();
 
+            bool cursorChanged = false;
             try
             {
                 if (frameInfo.LastMouseUpdateTime > 0)
                 {
+                    cursorChanged = true;
                     _cursorVisible = frameInfo.PointerPosition.Visible;
                     _cursorX = frameInfo.PointerPosition.Position.X;
                     _cursorY = frameInfo.PointerPosition.Position.Y;
@@ -288,6 +290,8 @@ public sealed unsafe class ScreenCapturer : IVideoCapturer
 
             if (!_hasLastFrame)
                 return false;
+
+            isNewDesktopImage = isNewDesktopImage || cursorChanged;
 
             // Composite cursor on top of a copy only if visible? Wait: if we composite directly into
             // _frameBuffer when LastPresentTime == 0, cursor trails would appear! So keep desktop clean

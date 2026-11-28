@@ -50,6 +50,7 @@ public partial class MainWindow : Window
     private bool _isUiInitializing = true;
     private bool _isStreaming;
     private volatile bool _videoEnabled = true;
+    private volatile bool _forceNextVideoFrame = true;
     private CancellationTokenSource? _streamCts;
     private Task? _captureTask;
     private IVideoCapturer? _videoCapturer;
@@ -842,6 +843,7 @@ public partial class MainWindow : Window
                 }
 
                 BroadcastCurrentServerInfo();
+                _forceNextVideoFrame = true;
             };
 
             _server.OnRuntimeConfigRequested += (reqFps, reqBitrate) =>
@@ -856,10 +858,15 @@ public partial class MainWindow : Window
                         _encoder.Reconfigure(_videoCapturer.Width, _videoCapturer.Height, _currentTargetFps, _currentBitrateKbps);
                     }
                 }
+                _forceNextVideoFrame = true;
                 BroadcastCurrentServerInfo();
             };
 
-            _server.OnKeyframeRequested += () => _encoder?.ForceKeyframe();
+            _server.OnKeyframeRequested += () =>
+            {
+                _forceNextVideoFrame = true;
+                _encoder?.ForceKeyframe();
+            };
 
             _streamCts = new CancellationTokenSource();
             await _server.StartAsync(_streamCts.Token);
@@ -899,6 +906,7 @@ public partial class MainWindow : Window
                 HideError();
                 StartOrSwitchVideoPipeline(useWindow, mon, win, _startupConfig.FfmpegPath, GetSelectedEncoder());
                 _videoEnabled = true;
+                _forceNextVideoFrame = true;
                 _encoder?.ForceKeyframe();
                 BroadcastCurrentServerInfo();
                 ShowToast(AppStrings.Get(_lang, "ToastVideoOn"));
@@ -1002,6 +1010,7 @@ public partial class MainWindow : Window
         {
             HideError();
             StartOrSwitchVideoPipeline(useWindow, mon, win, _startupConfig.FfmpegPath, GetSelectedEncoder());
+            _forceNextVideoFrame = true;
             _encoder?.ForceKeyframe();
             BroadcastCurrentServerInfo();
             ShowToast($"{AppStrings.Get(_lang, "ToastSourceChanged")}: {_activeSourceLabel}");
@@ -1073,6 +1082,8 @@ public partial class MainWindow : Window
         long framesInWindow = 0;
         long windowStartTs = Stopwatch.GetTimestamp();
         long nextFrameTs = Stopwatch.GetTimestamp();
+        long lastSubmitTs = 0;
+        long idleHeartbeatTicks = Stopwatch.Frequency / 4; // 4 FPS heartbeat when desktop is static
 
         while (!ct.IsCancellationRequested)
         {
@@ -1092,20 +1103,33 @@ public partial class MainWindow : Window
             }
             nextFrameTs = Math.Max(nextFrameTs + (long)frameIntervalTicks, Stopwatch.GetTimestamp());
 
+            bool activeStreaming = _videoEnabled && _server is { ConnectedClientCount: > 0 };
             bool submitted = false;
-            if (_videoEnabled && _server is { ConnectedClientCount: > 0 })
+            bool capturedButStatic = false;
+
+            if (activeStreaming)
             {
                 lock (_videoLock)
                 {
                     if (_videoCapturer is not null && _encoder is not null)
                     {
                         int timeoutMs = Math.Max(4, (int)(1000.0 / targetFps));
-                        if (_videoCapturer.TryCaptureFrame(timeoutMs, out var bgra, out _))
+                        if (_videoCapturer.TryCaptureFrame(timeoutMs, out var bgra, out bool isNewFrame))
                         {
-                            if (_encoder.TrySubmitFrame(bgra))
+                            long ts = Stopwatch.GetTimestamp();
+                            if (isNewFrame || _forceNextVideoFrame || (ts - lastSubmitTs >= idleHeartbeatTicks))
                             {
-                                framesInWindow++;
-                                submitted = true;
+                                if (_encoder.TrySubmitFrame(bgra))
+                                {
+                                    _forceNextVideoFrame = false;
+                                    lastSubmitTs = ts;
+                                    framesInWindow++;
+                                    submitted = true;
+                                }
+                            }
+                            else
+                            {
+                                capturedButStatic = true;
                             }
                         }
                     }
@@ -1114,8 +1138,16 @@ public partial class MainWindow : Window
 
             if (!submitted)
             {
-                Thread.Sleep(35);
-                nextFrameTs = Stopwatch.GetTimestamp();
+                if (capturedButStatic)
+                {
+                    // Desktop didn't change: wake rapidly for next frame instead of stalling 35ms
+                    Thread.Sleep(Math.Max(2, (int)(500.0 / targetFps)));
+                }
+                else
+                {
+                    Thread.Sleep(35);
+                    nextFrameTs = Stopwatch.GetTimestamp();
+                }
             }
 
             long statsNow = Stopwatch.GetTimestamp();
@@ -1311,7 +1343,6 @@ public partial class MainWindow : Window
         string cmdArgs =
             "/c \"netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8080\\\" >nul 2>&1 & " +
             "netsh advfirewall firewall delete rule name=\\\"PhoneDisplay TCP 8443\\\" >nul 2>&1 & " +
-            "netsh advfirewall firewall add rule name=\\\"PhoneDisplay TCP 8080\\\" dir=in action=allow protocol=TCP localport=8080 profile=any & " +
             "netsh advfirewall firewall add rule name=\\\"PhoneDisplay TCP 8443\\\" dir=in action=allow protocol=TCP localport=8443 profile=any\"";
 
         RunElevatedFirewallCommand(cmdArgs, AppStrings.Get(_lang, "FirewallOk"));

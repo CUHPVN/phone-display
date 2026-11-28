@@ -581,11 +581,11 @@
 
                             <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                                 <StackPanel>
-                                    <TextBlock x:Name="TxtFwSection" Text="Tường lửa Windows (Cổng 8080 &amp; 8443)" FontSize="13.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                                    <TextBlock x:Name="TxtFwDesc" Text="Cần mở cổng khi kết nối qua Wi-Fi LAN hoặc Radmin VPN giữa 2 máy PC. Bấm Khóa FW để xóa rule khi không dùng."
+                                    <TextBlock x:Name="TxtFwSection" Text="Tường lửa Windows (Chỉ mở cổng HTTPS 8443)" FontSize="13.5" FontWeight="SemiBold" Foreground="#F8FAFC"/>
+                                    <TextBlock x:Name="TxtFwDesc" Text="Chỉ mở cổng HTTPS/WSS 8443 có mã hóa khi dùng Wi-Fi LAN hoặc Radmin VPN. Cổng USB 8080 được khóa riêng trên 127.0.0.1."
                                                FontSize="12" Foreground="#94A3B8" Margin="0,4,0,12" TextWrapping="Wrap"/>
                                     <StackPanel Orientation="Horizontal">
-                                        <Button x:Name="BtnFirewallOpen" Content="Mở Firewall (8080 &amp; 8443)" Style="{StaticResource SecondaryButton}"
+                                        <Button x:Name="BtnFirewallOpen" Content="Mở Firewall (8443)" Style="{StaticResource SecondaryButton}"
                                                 Background="#14261C" BorderBrush="#1E462E" Foreground="#4ADE80" Click="BtnFirewallOpen_Click" Margin="0,0,10,0"/>
                                         <Button x:Name="BtnFirewallClose" Content="Khóa lại Firewall" Style="{StaticResource SecondaryButton}"
                                                 Click="BtnFirewallClose_Click"/>

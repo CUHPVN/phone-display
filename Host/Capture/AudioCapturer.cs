@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
@@ -142,32 +143,67 @@ public sealed class AudioCapturer : IDisposable
 
         if (isFloat && wf.BitsPerSample == 32)
         {
-            for (int f = 0; f < frameCount; f++)
+            if (blockAlign == srcChannels * 4 && BitConverter.IsLittleEndian)
             {
-                int frameOff = f * blockAlign;
-                if (dstChannels == 1)
+                ReadOnlySpan<float> floats = MemoryMarshal.Cast<byte, float>(src);
+                Span<short> pcmShorts = MemoryMarshal.Cast<byte, short>(dst);
+                for (int f = 0; f < frameCount; f++)
                 {
-                    float s0 = BitConverter.ToSingle(src.Slice(frameOff, 4));
-                    short v = FloatToInt16(s0);
-                    if (v != 0) hasSound = true;
-                    BinaryPrimitives.WriteInt16LittleEndian(dst.Slice(f * 2, 2), v);
-                }
-                else
-                {
-                    float fl = BitConverter.ToSingle(src.Slice(frameOff, 4));
-                    float fr = srcChannels >= 2 ? BitConverter.ToSingle(src.Slice(frameOff + 4, 4)) : fl;
-                    if (srcChannels >= 6)
+                    int baseIdx = f * srcChannels;
+                    if (dstChannels == 1)
                     {
-                        // Mix center channel (ch2) into both L & R for 5.1/7.1 layouts
-                        float fc = BitConverter.ToSingle(src.Slice(frameOff + 8, 4)) * 0.707f;
-                        fl += fc;
-                        fr += fc;
+                        short v = FloatToInt16(floats[baseIdx]);
+                        if (v != 0) hasSound = true;
+                        pcmShorts[f] = v;
                     }
-                    short vl = FloatToInt16(fl);
-                    short vr = FloatToInt16(fr);
-                    if (vl != 0 || vr != 0) hasSound = true;
-                    BinaryPrimitives.WriteInt16LittleEndian(dst.Slice(f * 4, 2), vl);
-                    BinaryPrimitives.WriteInt16LittleEndian(dst.Slice(f * 4 + 2, 2), vr);
+                    else
+                    {
+                        float fl = floats[baseIdx];
+                        float fr = srcChannels >= 2 ? floats[baseIdx + 1] : fl;
+                        if (srcChannels >= 6)
+                        {
+                            // Mix center channel (ch2) into both L & R for 5.1/7.1 layouts
+                            float fc = floats[baseIdx + 2] * 0.707f;
+                            fl += fc;
+                            fr += fc;
+                        }
+                        short vl = FloatToInt16(fl);
+                        short vr = FloatToInt16(fr);
+                        if (vl != 0 || vr != 0) hasSound = true;
+                        int d = f * 2;
+                        pcmShorts[d] = vl;
+                        pcmShorts[d + 1] = vr;
+                    }
+                }
+            }
+            else
+            {
+                for (int f = 0; f < frameCount; f++)
+                {
+                    int frameOff = f * blockAlign;
+                    if (dstChannels == 1)
+                    {
+                        float s0 = BitConverter.ToSingle(src.Slice(frameOff, 4));
+                        short v = FloatToInt16(s0);
+                        if (v != 0) hasSound = true;
+                        BinaryPrimitives.WriteInt16LittleEndian(dst.Slice(f * 2, 2), v);
+                    }
+                    else
+                    {
+                        float fl = BitConverter.ToSingle(src.Slice(frameOff, 4));
+                        float fr = srcChannels >= 2 ? BitConverter.ToSingle(src.Slice(frameOff + 4, 4)) : fl;
+                        if (srcChannels >= 6)
+                        {
+                            float fc = BitConverter.ToSingle(src.Slice(frameOff + 8, 4)) * 0.707f;
+                            fl += fc;
+                            fr += fc;
+                        }
+                        short vl = FloatToInt16(fl);
+                        short vr = FloatToInt16(fr);
+                        if (vl != 0 || vr != 0) hasSound = true;
+                        BinaryPrimitives.WriteInt16LittleEndian(dst.Slice(f * 4, 2), vl);
+                        BinaryPrimitives.WriteInt16LittleEndian(dst.Slice(f * 4 + 2, 2), vr);
+                    }
                 }
             }
         }
