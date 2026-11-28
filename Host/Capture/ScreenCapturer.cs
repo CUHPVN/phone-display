@@ -6,7 +6,7 @@ using Vortice.DXGI;
 
 namespace PhoneDisplay.Host.Capture;
 
-public sealed unsafe class ScreenCapturer : IDisposable
+public sealed unsafe class ScreenCapturer : IVideoCapturer
 {
     private readonly int _adapterIndex;
     private readonly int _outputIndex;

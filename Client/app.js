@@ -13,6 +13,7 @@
   const pillControls = document.getElementById("pill-controls");
   const btnMode = document.getElementById("btn-mode");
   const btnKeyboard = document.getElementById("btn-keyboard");
+  const btnAudio = document.getElementById("btn-audio");
   const mobileKbdInput = document.getElementById("mobile-kbd-input");
   const btnFps = document.getElementById("btn-fps");
   const btnBitrate = document.getElementById("btn-bitrate");
@@ -34,6 +35,9 @@
   const txtHint1 = document.getElementById("txt-hint-1");
   const txtHint2 = document.getElementById("txt-hint-2");
   const txtHint3 = document.getElementById("txt-hint-3");
+  const audioOnlyBanner = document.getElementById("audio-only-banner");
+  const txtAudioOnlyTitle = document.getElementById("txt-audio-only-title");
+  const txtAudioOnlySub = document.getElementById("txt-audio-only-sub");
   const pinBox = document.getElementById("pin-box");
   const inputPin = document.getElementById("input-pin");
   const urlToken = new URLSearchParams(window.location.search).get("token") || "";
@@ -62,6 +66,14 @@
       kbdOff: "Bàn phím: TẮT",
       kbdBtnOn: "⌨ Bật",
       kbdBtnOff: "⌨ Tắt",
+      audioBtnOn: "🔊 Bật",
+      audioBtnOff: "🔇 Tắt",
+      audioOn: "Âm thanh: BẬT",
+      audioOff: "Âm thanh: TẮT",
+      audioOnlyTitle: "Chỉ phát âm thanh",
+      audioOnlySub: "Host đang tắt truyền hình ảnh",
+      inputLockedByHost: "Host đã khóa điều khiển chuột & bàn phím",
+      inputUnlockedByHost: "Host đã mở lại điều khiển chuột & bàn phím",
       modeView: "Chỉ xem",
       modeTrackpad: "Trackpad",
       modeTouch: "Chạm",
@@ -89,6 +101,14 @@
       kbdOff: "Keyboard OFF",
       kbdBtnOn: "⌨ On",
       kbdBtnOff: "⌨ Off",
+      audioBtnOn: "🔊 On",
+      audioBtnOff: "🔇 Off",
+      audioOn: "Audio ON",
+      audioOff: "Audio OFF",
+      audioOnlyTitle: "Audio Only",
+      audioOnlySub: "Video stream is paused on host",
+      inputLockedByHost: "Host locked remote mouse & keyboard",
+      inputUnlockedByHost: "Host unlocked remote mouse & keyboard",
       modeView: "View Only",
       modeTrackpad: "Trackpad",
       modeTouch: "Touch",
@@ -115,10 +135,16 @@
     txtHint2.textContent = t("hint2");
     txtHint3.textContent = t("hint3");
     btnWebLang.textContent = webLang === "vi" ? "VI" : "EN";
+    if (txtAudioOnlyTitle) txtAudioOnlyTitle.textContent = t("audioOnlyTitle");
+    if (txtAudioOnlySub) txtAudioOnlySub.textContent = t("audioOnlySub");
 
     const modeLabels = { view: t("modeView"), trackpad: t("modeTrackpad"), touch: t("modeTouch") };
     btnMode.textContent = modeLabels[inputMode] || t("modeView");
     btnKeyboard.textContent = isMobileKeyboardOpen ? t("kbdBtnOn") : t("kbdBtnOff");
+    if (btnAudio) {
+      btnAudio.textContent = audioEnabled ? t("audioBtnOn") : t("audioBtnOff");
+      btnAudio.classList.toggle("active", audioEnabled);
+    }
   }
 
   btnWebLang.addEventListener("click", () => {
@@ -155,6 +181,14 @@
   let inputModeIndex = 0;
   let inputMode = "view"; // "view" | "trackpad" | "touch"
   let isMobileKeyboardOpen = false;
+  let hostVideoEnabled = true;
+  let hostAllowInput = true;
+  let audioEnabled = true;
+  let audioCtx = null;
+  let audioGain = null;
+  let audioNextPlayTime = 0;
+  const AUDIO_TARGET_BUFFER_SEC = 0.045;
+  const AUDIO_MAX_BUFFER_SEC = 0.16;
   applyWebLang();
   const fpsPresets = [60, 90, 120];
   let fpsPresetIndex = 0;
@@ -277,6 +311,10 @@
             statRes.textContent = `${videoWidth}x${videoHeight}`;
           }
 
+          if (audioOnlyBanner && !audioOnlyBanner.classList.contains("hidden")) {
+            audioOnlyBanner.classList.add("hidden");
+          }
+
           ctx.fillStyle = "#000000";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(frame, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
@@ -320,6 +358,86 @@
     }
   }
 
+  function initAudioContext() {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!audioCtx || audioCtx.state === "closed") {
+      try {
+        audioCtx = new AudioCtx({ latencyHint: "interactive" });
+        audioGain = audioCtx.createGain();
+        audioGain.gain.value = audioEnabled ? 1.0 : 0.0;
+        audioGain.connect(audioCtx.destination);
+        audioNextPlayTime = 0;
+      } catch {
+        audioCtx = null;
+        audioGain = null;
+        return;
+      }
+    }
+
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => { /* ignore autoplay restriction until next tap */ });
+    }
+  }
+
+  function closeAudioContext() {
+    audioNextPlayTime = 0;
+    audioGain = null;
+    if (audioCtx) {
+      try {
+        if (audioCtx.state !== "closed") audioCtx.close();
+      } catch { /* ignore */ }
+      audioCtx = null;
+    }
+  }
+
+  function handleAudioPacket(arrayBuffer) {
+    if (!audioEnabled || !audioCtx || !audioGain) return;
+    if (arrayBuffer.byteLength <= 14) return;
+
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => { });
+      if (audioCtx.state !== "running") return;
+    }
+
+    const view = new DataView(arrayBuffer);
+    const sampleRate = view.getUint32(1);
+    const channels = Math.min(2, Math.max(1, view.getUint8(5)));
+    if (sampleRate < 8000 || sampleRate > 192000) return;
+
+    const pcmBytes = arrayBuffer.byteLength - 14;
+    const frameCount = Math.floor(pcmBytes / (channels * 2));
+    if (frameCount <= 0) return;
+
+    const audioBuffer = audioCtx.createBuffer(channels, frameCount, sampleRate);
+    if (channels === 1) {
+      const ch0 = audioBuffer.getChannelData(0);
+      for (let i = 0; i < frameCount; i++) {
+        ch0[i] = view.getInt16(14 + i * 2, true) / 32768.0;
+      }
+    } else {
+      const ch0 = audioBuffer.getChannelData(0);
+      const ch1 = audioBuffer.getChannelData(1);
+      for (let i = 0; i < frameCount; i++) {
+        const off = 14 + i * 4;
+        ch0[i] = view.getInt16(off, true) / 32768.0;
+        ch1[i] = view.getInt16(off + 2, true) / 32768.0;
+      }
+    }
+
+    const now = audioCtx.currentTime;
+    if (audioNextPlayTime < now || audioNextPlayTime > now + AUDIO_MAX_BUFFER_SEC) {
+      audioNextPlayTime = now + AUDIO_TARGET_BUFFER_SEC;
+    }
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = audioBuffer;
+    src.connect(audioGain);
+    src.start(audioNextPlayTime);
+    audioNextPlayTime += audioBuffer.duration;
+  }
+
   function connectWebSocket() {
     clearTimeout(reconnectTimer);
     if (ws) {
@@ -352,6 +470,8 @@
         refreshRate: fpsPresets[fpsPresetIndex]
       });
 
+      sendControl({ type: "config", audioEnabled });
+
       clearInterval(pingTimer);
       pingTimer = setInterval(() => {
         sendControl({ type: "ping", ts: Date.now() });
@@ -364,12 +484,21 @@
         return;
       }
 
+      if (ev.data instanceof ArrayBuffer && ev.data.byteLength > 0) {
+        const pktType = new DataView(ev.data).getUint8(0);
+        if (pktType === 2) {
+          handleAudioPacket(ev.data);
+          return;
+        }
+      }
+
       handleVideoPacket(ev.data);
     };
 
     ws.onclose = (ev) => {
       clearInterval(pingTimer);
       closeDecoder();
+      audioNextPlayTime = 0;
       if (isRunning) {
         if (ev.code === 1006 && !hasConnectedOnce) {
           showToast(t("rejected"), 3500);
@@ -393,12 +522,35 @@
       videoWidth = msg.width || videoWidth;
       videoHeight = msg.height || videoHeight;
       activeEncoderName = msg.encoder || "--";
-      statRes.textContent = `${videoWidth}x${videoHeight}`;
+      statRes.textContent = msg.videoEnabled === false ? "Audio" : `${videoWidth}x${videoHeight}`;
       statEncName.textContent = activeEncoderName;
       computeDrawRect();
-      waitingForKeyframe = true;
-      if (decoder && decoder.state === "closed") {
-        initDecoder(msg.codec || "avc1.42E028");
+
+      if (msg.videoEnabled === false) {
+        hostVideoEnabled = false;
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        audioOnlyBanner?.classList.remove("hidden");
+      } else {
+        hostVideoEnabled = true;
+        audioOnlyBanner?.classList.add("hidden");
+        waitingForKeyframe = true;
+        if (decoder && decoder.state === "closed") {
+          initDecoder(msg.codec || "avc1.42E028");
+        }
+      }
+
+      if (typeof msg.allowInput === "boolean" && msg.allowInput !== hostAllowInput) {
+        hostAllowInput = msg.allowInput;
+        showToast(t(hostAllowInput ? "inputUnlockedByHost" : "inputLockedByHost"), 2000);
+        if (!hostAllowInput) {
+          mobileKbdInput.blur();
+          setMobileKeyboardUi(false);
+          btnMode.textContent = t("modeView");
+          btnMode.classList.remove("active");
+        } else {
+          applyWebLang();
+        }
       }
     } else if (msg.type === "pong") {
       lastRttMs = Math.max(0, Date.now() - (msg.ts || Date.now()));
@@ -534,7 +686,7 @@
   canvas.addEventListener("selectstart", (e) => e.preventDefault());
 
   canvas.addEventListener("wheel", (e) => {
-    if (!isRunning || inputMode === "view") return;
+    if (!isRunning || !hostAllowInput || inputMode === "view") return;
     e.preventDefault();
     sendControl({
       type: "input",
@@ -545,7 +697,10 @@
   }, { passive: false });
 
   canvas.addEventListener("pointerdown", (e) => {
-    if (!isRunning || inputMode === "view" || isOverWebUi(e)) return;
+    if (audioEnabled && audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => { });
+    }
+    if (!isRunning || !hostAllowInput || inputMode === "view" || isOverWebUi(e)) return;
     e.preventDefault();
 
     try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -652,7 +807,7 @@
   });
 
   canvas.addEventListener("pointermove", (e) => {
-    if (!isRunning || inputMode === "view") return;
+    if (!isRunning || !hostAllowInput || inputMode === "view") return;
     if (e.pointerType === "mouse" && isOverWebUi(e) && !activePointers.has(e.pointerId)) return;
 
     // Mouse / Laptop Touchpad on PC browsers
@@ -846,6 +1001,10 @@
 
   btnMode.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (!hostAllowInput) {
+      showToast(t("inputLockedByHost"), 2000);
+      return;
+    }
     inputModeIndex = (inputModeIndex + 1) % inputModes.length;
     inputMode = inputModes[inputModeIndex];
     const labels = {
@@ -892,6 +1051,12 @@
 
   btnKeyboard.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (!hostAllowInput) {
+      mobileKbdInput.blur();
+      setMobileKeyboardUi(false);
+      showToast(t("inputLockedByHost"), 2000);
+      return;
+    }
     if (kbdWasOpenOnDown) {
       mobileKbdInput.blur();
       setMobileKeyboardUi(false);
@@ -973,17 +1138,36 @@
   });
 
   window.addEventListener("keydown", (e) => {
-    if (!isRunning || inputMode === "view") return;
+    if (!isRunning || !hostAllowInput || inputMode === "view") return;
     if (document.activeElement === mobileKbdInput || document.activeElement === inputPin) return;
     e.preventDefault();
     sendControl({ type: "input", action: "keydown", key: e.key, code: e.code });
   });
 
   window.addEventListener("keyup", (e) => {
-    if (!isRunning || inputMode === "view") return;
+    if (!isRunning || !hostAllowInput || inputMode === "view") return;
     if (document.activeElement === mobileKbdInput || document.activeElement === inputPin) return;
     e.preventDefault();
     sendControl({ type: "input", action: "keyup", key: e.key, code: e.code });
+  });
+
+  btnAudio.addEventListener("click", (e) => {
+    e.stopPropagation();
+    audioEnabled = !audioEnabled;
+    if (audioEnabled) {
+      initAudioContext();
+      if (audioGain && audioCtx) {
+        audioGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+      }
+      audioNextPlayTime = 0;
+    } else if (audioGain && audioCtx) {
+      audioGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+    }
+
+    btnAudio.textContent = audioEnabled ? t("audioBtnOn") : t("audioBtnOff");
+    btnAudio.classList.toggle("active", audioEnabled);
+    sendControl({ type: "config", audioEnabled });
+    showToast(audioEnabled ? t("audioOn") : t("audioOff"), 1200);
   });
 
   btnFps.addEventListener("click", (e) => {
@@ -1025,6 +1209,7 @@
       ws = null;
     }
     closeDecoder();
+    closeAudioContext();
 
     if (wakeLock) {
       try { await wakeLock.release(); } catch { }
@@ -1036,11 +1221,13 @@
 
     miniPill.classList.add("hidden");
     statsHud.classList.add("hidden");
+    audioOnlyBanner?.classList.add("hidden");
     landingOverlay.classList.remove("hidden");
   });
 
   btnStart.addEventListener("click", async () => {
     isRunning = true;
+    initAudioContext();
     landingOverlay.classList.add("hidden");
     miniPill.classList.remove("hidden");
     resizeCanvas();

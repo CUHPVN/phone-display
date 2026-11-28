@@ -18,6 +18,11 @@ public sealed class AppConfig
     public bool AutoMatchResolution { get; set; } = true;
     public bool AllowPrimaryAutoResize { get; set; } = false;
     public string FfmpegPath { get; set; } = "ffmpeg";
+    public string? CustomPin { get; set; }
+    public bool AutoStart { get; set; } = false;
+    public bool EnableVideo { get; set; } = true;
+    public bool EnableAudio { get; set; } = true;
+    public bool AllowRemoteInput { get; set; } = true;
 
     public static AppConfig Parse(string[] args)
     {
@@ -73,6 +78,24 @@ public sealed class AppConfig
                     string? path = Next();
                     if (!string.IsNullOrWhiteSpace(path)) config.FfmpegPath = path;
                     break;
+                case "--pin":
+                case "--token":
+                    string? pin = Next();
+                    if (!string.IsNullOrWhiteSpace(pin)) config.CustomPin = pin.Trim();
+                    break;
+                case "--autostart":
+                case "--auto-start":
+                    config.AutoStart = true;
+                    break;
+                case "--no-video":
+                    config.EnableVideo = false;
+                    break;
+                case "--no-audio":
+                    config.EnableAudio = false;
+                    break;
+                case "--no-input":
+                    config.AllowRemoteInput = false;
+                    break;
                 case "--help":
                 case "-h":
                     PrintHelp();
@@ -101,6 +124,11 @@ public sealed class AppConfig
               -e, --encoder <mode>      auto | nvenc | x264 (default: auto)
                   --no-auto-res         Disable auto-matching secondary monitor resolution
                   --ffmpeg <path>       Path to ffmpeg.exe (default: ffmpeg in PATH)
+                  --pin <pin>           Set custom session PIN / token
+                  --autostart           Automatically start streaming on launch
+                  --no-video            Disable screen video capture (audio-only mode)
+                  --no-audio            Disable WASAPI loopback system audio capture
+                  --no-input            Disable remote mouse & keyboard input (view-only)
               -h, --help                Show this help
             """);
     }

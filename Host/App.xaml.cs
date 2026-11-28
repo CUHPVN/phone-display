@@ -27,8 +27,9 @@ public partial class App : System.Windows.Application
             e.Handled = true;
         };
 
+        var startupConfig = Models.AppConfig.Parse(args);
         app.InitializeComponent();
-        var window = new UI.MainWindow();
+        var window = new UI.MainWindow(startupConfig);
         app.Run(window);
     }
 }

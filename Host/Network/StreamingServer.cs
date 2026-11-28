@@ -25,6 +25,7 @@ public sealed class StreamingServer : IAsyncDisposable
     private volatile bool _isStopping;
 
     public int ConnectedClientCount => _clients.Count;
+    public volatile bool AllowRemoteInput = true;
 
     public event Action<int, int, int>? OnClientHello;
     public event Action<int?, int?>? OnRuntimeConfigRequested;
@@ -170,12 +171,15 @@ public sealed class StreamingServer : IAsyncDisposable
                     break;
 
                 case "input":
-                    if (!_isStopping)
+                    if (!_isStopping && AllowRemoteInput)
                         _inputInjector.HandleInput(msg);
                     break;
 
                 case "config":
-                    OnRuntimeConfigRequested?.Invoke(msg.Fps, msg.BitrateKbps);
+                    if (msg.AudioEnabled.HasValue)
+                        session.AudioEnabled = msg.AudioEnabled.Value;
+                    if (msg.Fps.HasValue || msg.BitrateKbps.HasValue)
+                        OnRuntimeConfigRequested?.Invoke(msg.Fps, msg.BitrateKbps);
                     break;
 
                 case "keyframe":
@@ -200,7 +204,29 @@ public sealed class StreamingServer : IAsyncDisposable
         }
     }
 
-    public void BroadcastServerInfo(int width, int height, int fps, int bitrateKbps, string encoder)
+    public void BroadcastAudioFrame(byte[] packet)
+    {
+        if (_clients.IsEmpty) return;
+
+        foreach (var kvp in _clients)
+        {
+            if (kvp.Value.AudioEnabled)
+                kvp.Value.EnqueueAudio(packet);
+        }
+    }
+
+    public void BroadcastServerInfo(
+        int width,
+        int height,
+        int fps,
+        int bitrateKbps,
+        string encoder,
+        bool audioEnabled = true,
+        int audioSampleRate = 48000,
+        int audioChannels = 2,
+        bool videoEnabled = true,
+        bool allowInput = true,
+        string sourceLabel = "")
     {
         if (_clients.IsEmpty) return;
 
@@ -210,7 +236,13 @@ public sealed class StreamingServer : IAsyncDisposable
             Height = height,
             Fps = fps,
             BitrateKbps = bitrateKbps,
-            Encoder = encoder
+            Encoder = encoder,
+            AudioEnabled = audioEnabled,
+            AudioSampleRate = audioSampleRate,
+            AudioChannels = audioChannels,
+            VideoEnabled = videoEnabled,
+            AllowInput = allowInput,
+            SourceLabel = sourceLabel
         });
 
         foreach (var kvp in _clients)
@@ -238,17 +270,39 @@ public sealed class StreamingServer : IAsyncDisposable
     {
         public Guid Id { get; }
         public WebSocket Socket { get; }
+        public volatile bool AudioEnabled = true;
 
-        private readonly Channel<(byte[] Data, WebSocketMessageType Type)> _channel;
+        private readonly Channel<byte[]> _controlChannel;
+        private readonly Channel<byte[]> _audioChannel;
+        private readonly Channel<byte[]> _videoChannel;
+        private readonly SemaphoreSlim _sendSignal = new(0);
         private readonly CancellationTokenSource _cts = new();
         private volatile bool _waitingForKeyframe = true;
+        private int _signalPending;
 
         public ClientSession(Guid id, WebSocket socket)
         {
             Id = id;
             Socket = socket;
+
+            _controlChannel = Channel.CreateBounded<byte[]>(
+                new BoundedChannelOptions(32)
+                {
+                    FullMode = BoundedChannelFullMode.DropOldest,
+                    SingleReader = true,
+                    SingleWriter = false
+                });
+
+            _audioChannel = Channel.CreateBounded<byte[]>(
+                new BoundedChannelOptions(6)
+                {
+                    FullMode = BoundedChannelFullMode.DropOldest,
+                    SingleReader = true,
+                    SingleWriter = false
+                });
+
             // Wait mode + TryWrite check: if full, drop until next IDR keyframe so H.264 reference chain never breaks
-            _channel = Channel.CreateBounded<(byte[], WebSocketMessageType)>(
+            _videoChannel = Channel.CreateBounded<byte[]>(
                 new BoundedChannelOptions(24)
                 {
                     FullMode = BoundedChannelFullMode.Wait,
@@ -257,59 +311,99 @@ public sealed class StreamingServer : IAsyncDisposable
                 });
         }
 
+        private void SignalSend()
+        {
+            if (Interlocked.Exchange(ref _signalPending, 1) == 0)
+            {
+                try { _sendSignal.Release(); } catch (ObjectDisposedException) { }
+            }
+        }
+
         public void EnqueueVideo(byte[] packet, bool isKeyframe)
         {
             if (isKeyframe)
             {
                 _waitingForKeyframe = false;
-                if (!_channel.Writer.TryWrite((packet, WebSocketMessageType.Binary)))
+                if (!_videoChannel.Writer.TryWrite(packet))
                 {
-                    // Drain stale frames and push the fresh keyframe
-                    while (_channel.Reader.TryRead(out _)) { }
-                    _channel.Writer.TryWrite((packet, WebSocketMessageType.Binary));
+                    // Drain stale frames and push the fresh keyframe without touching audio/control
+                    while (_videoChannel.Reader.TryRead(out _)) { }
+                    _videoChannel.Writer.TryWrite(packet);
                 }
+                SignalSend();
                 return;
             }
 
             if (_waitingForKeyframe)
                 return;
 
-            if (!_channel.Writer.TryWrite((packet, WebSocketMessageType.Binary)))
+            if (_videoChannel.Writer.TryWrite(packet))
+            {
+                SignalSend();
+            }
+            else
             {
                 // Never drop a single P-frame silently (would corrupt H.264 GOP); wait for next keyframe
                 _waitingForKeyframe = true;
             }
         }
 
+        public void EnqueueAudio(byte[] packet)
+        {
+            if (_audioChannel.Writer.TryWrite(packet))
+                SignalSend();
+        }
+
         public void EnqueueText(string json)
         {
             byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
-            _channel.Writer.TryWrite((bytes, WebSocketMessageType.Text));
+            if (_controlChannel.Writer.TryWrite(bytes))
+                SignalSend();
         }
 
         public async Task RunSendLoopAsync()
         {
             try
             {
-                await foreach (var item in _channel.Reader.ReadAllAsync(_cts.Token))
+                while (!_cts.IsCancellationRequested && Socket.State == WebSocketState.Open)
                 {
-                    if (Socket.State != WebSocketState.Open)
-                        break;
+                    await _sendSignal.WaitAsync(_cts.Token);
+                    Interlocked.Exchange(ref _signalPending, 0);
 
-                    await Socket.SendAsync(
-                        item.Data,
-                        item.Type,
-                        endOfMessage: true,
-                        _cts.Token);
+                    while (Socket.State == WebSocketState.Open && !_cts.IsCancellationRequested)
+                    {
+                        if (_controlChannel.Reader.TryRead(out var ctrl))
+                        {
+                            await Socket.SendAsync(ctrl, WebSocketMessageType.Text, endOfMessage: true, _cts.Token);
+                            continue;
+                        }
+
+                        if (_audioChannel.Reader.TryRead(out var audio))
+                        {
+                            await Socket.SendAsync(audio, WebSocketMessageType.Binary, endOfMessage: true, _cts.Token);
+                            continue;
+                        }
+
+                        if (_videoChannel.Reader.TryRead(out var video))
+                        {
+                            await Socket.SendAsync(video, WebSocketMessageType.Binary, endOfMessage: true, _cts.Token);
+                            continue;
+                        }
+
+                        break;
+                    }
                 }
             }
             catch (OperationCanceledException) { }
             catch (WebSocketException) { }
+            catch (ObjectDisposedException) { }
         }
 
         public void Complete()
         {
-            _channel.Writer.TryComplete();
+            _controlChannel.Writer.TryComplete();
+            _audioChannel.Writer.TryComplete();
+            _videoChannel.Writer.TryComplete();
             _cts.Cancel();
         }
 
@@ -325,6 +419,7 @@ public sealed class StreamingServer : IAsyncDisposable
 
         public void Dispose()
         {
+            _sendSignal.Dispose();
             _cts.Dispose();
         }
     }

@@ -18,6 +18,11 @@ public sealed class InputInjector
         UpdateMonitorBounds(monitor.Left, monitor.Top, monitor.Width, monitor.Height);
     }
 
+    public InputInjector(int left, int top, int width, int height)
+    {
+        UpdateMonitorBounds(left, top, width, height);
+    }
+
     public void UpdateMonitorBounds(int left, int top, int width, int height)
     {
         lock (_lock)

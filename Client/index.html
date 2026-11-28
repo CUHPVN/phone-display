@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>PhoneDisplay — Extended Monitor</title>
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
   <div id="app">
@@ -64,6 +64,7 @@
       <div id="pill-controls" class="pill-controls hidden">
         <button id="btn-mode" class="pill-btn" title="Switch Input Mode (View Only / Trackpad / Touch)">View Only</button>
         <button id="btn-keyboard" class="pill-btn" title="Toggle Keyboard">⌨ Off</button>
+        <button id="btn-audio" class="pill-btn active" title="Toggle Audio">🔊 On</button>
         <button id="btn-fps" class="pill-btn" title="Cycle FPS (60/90/120)">60 FPS</button>
         <button id="btn-bitrate" class="pill-btn" title="Cycle Bitrate (8/15/25 Mbps)">12M</button>
         <button id="btn-stats" class="pill-btn" title="Toggle Stats HUD">HUD</button>
@@ -78,8 +79,15 @@
 
     <!-- Connection Toast -->
     <div id="toast" class="toast hidden">Connecting...</div>
+
+    <!-- Audio-Only Mode Overlay -->
+    <div id="audio-only-banner" class="audio-only-banner hidden">
+      <div class="audio-only-icon">🔊</div>
+      <div id="txt-audio-only-title" class="audio-only-title">Audio Only</div>
+      <div id="txt-audio-only-sub" class="audio-only-sub">Video stream is paused on host</div>
+    </div>
   </div>
 
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

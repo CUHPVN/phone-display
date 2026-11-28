@@ -4,7 +4,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="PhoneDisplay"
         Width="900"
-        Height="660"
+        Height="700"
         MinWidth="740"
         MinHeight="560"
         WindowStartupLocation="CenterScreen"
@@ -341,22 +341,72 @@
                         <!-- TAB 0: STREAM -->
                         <StackPanel x:Name="PageStream" Visibility="Visible">
                             <TextBlock x:Name="TxtStreamTitle" Text="Cấu hình phát hình" FontSize="19" FontWeight="SemiBold" Foreground="#F8FAFC"/>
-                            <TextBlock x:Name="TxtStreamSub" Text="Chọn màn hình, tốc độ khung hình và bộ mã hóa phần cứng NVIDIA NVENC."
+                            <TextBlock x:Name="TxtStreamSub" Text="Tùy chỉnh luồng truyền Hình ảnh, Âm thanh, Điều khiển, nguồn Cửa sổ và Encoder."
                                        FontSize="12.5" Foreground="#94A3B8" Margin="0,4,0,16"/>
 
                             <Border Style="{StaticResource CardBorder}">
                                 <StackPanel>
-                                    <TextBlock x:Name="TxtTargetMonitor" Text="Màn hình mục tiêu" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                                    <!-- Stream Channels (Live toggleable) -->
+                                    <Border Style="{StaticResource SubCard}" Margin="0,0,0,14" Padding="12,10">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                <TextBlock x:Name="TxtChannelsLabel" Text="Luồng truyền (có thể bật/tắt trực tiếp khi đang phát)"
+                                                           FontSize="11.5" FontWeight="SemiBold" Foreground="#CBD5E1" VerticalAlignment="Center"/>
+                                                <Border Background="#14261C" BorderBrush="#1E462E" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="8,0,0,0">
+                                                    <TextBlock Text="LIVE" FontSize="9.5" FontWeight="Bold" Foreground="#4ADE80"/>
+                                                </Border>
+                                            </StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="1.4*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox x:Name="ChkStreamVideo" Grid.Column="0" IsChecked="True" Foreground="#F8FAFC" FontSize="12.5" Cursor="Hand"
+                                                          Content="Hình ảnh" Checked="ChkStreamVideo_Changed" Unchecked="ChkStreamVideo_Changed"/>
+                                                <CheckBox x:Name="ChkStreamAudio" Grid.Column="1" IsChecked="True" Foreground="#F8FAFC" FontSize="12.5" Cursor="Hand"
+                                                          Content="Âm thanh" Checked="ChkStreamAudio_Changed" Unchecked="ChkStreamAudio_Changed"/>
+                                                <CheckBox x:Name="ChkAllowInput" Grid.Column="2" IsChecked="True" Foreground="#F8FAFC" FontSize="12.5" Cursor="Hand"
+                                                          Content="Điều khiển (Chuột &amp; Phím)" Checked="ChkAllowInput_Changed" Unchecked="ChkAllowInput_Changed"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Video Source Type & Target -->
                                     <Grid Margin="0,0,0,14">
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="195"/>
+                                            <ColumnDefinition Width="12"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <ComboBox x:Name="CmbMonitor" Grid.Column="0"/>
-                                        <Button x:Name="BtnRefreshMonitors" Grid.Column="2" Content="Làm mới"
-                                                Style="{StaticResource SecondaryButton}" Height="36" Click="BtnRefreshMonitors_Click"/>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock x:Name="TxtVideoSourceTypeLabel" Text="Nguồn phát hình" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                                            <ComboBox x:Name="CmbVideoSourceType" SelectionChanged="CmbVideoSourceType_SelectionChanged">
+                                                <ComboBoxItem x:Name="CmbSrcMonitor" Content="Toàn màn hình (Display)" Tag="monitor" IsSelected="True"/>
+                                                <ComboBoxItem x:Name="CmbSrcWindow" Content="Cửa sổ ứng dụng (Window)" Tag="window"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock x:Name="TxtTargetMonitor" Text="Màn hình mục tiêu" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="8"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="CmbMonitor" Grid.Column="0" SelectionChanged="CmbVideoTarget_SelectionChanged"/>
+                                                <ComboBox x:Name="CmbWindow" Grid.Column="0" Visibility="Collapsed" SelectionChanged="CmbVideoTarget_SelectionChanged"/>
+                                                <Button x:Name="BtnRefreshMonitors" Grid.Column="2" Content="Làm mới"
+                                                        Style="{StaticResource SecondaryButton}" Height="36" Click="BtnRefreshMonitors_Click"/>
+                                            </Grid>
+                                        </StackPanel>
                                     </Grid>
+
+                                    <!-- Audio Output Device -->
+                                    <StackPanel Margin="0,0,0,14">
+                                        <TextBlock x:Name="TxtAudioDeviceLabel" Text="Thiết bị âm thanh nguồn (Loa / Tai nghe)" FontSize="12" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                                        <ComboBox x:Name="CmbAudioDevice" SelectionChanged="CmbAudioDevice_SelectionChanged"/>
+                                    </StackPanel>
 
                                     <Grid Margin="0,0,0,14">
                                         <Grid.ColumnDefinitions>
@@ -587,7 +637,7 @@
                                         <Border Background="#14261C" BorderBrush="#1E462E" BorderThickness="1" CornerRadius="4" Padding="8,3">
                                             <TextBlock Text="STABLE" FontSize="10" FontWeight="Bold" Foreground="#4ADE80"/>
                                         </Border>
-                                        <TextBlock x:Name="TxtStatusRow1" Grid.Column="2" Text="DXGI + NVENC H.264 Stream, USB ADB / Tethering, Wi-Fi Android Chrome, View Only / Trackpad / Touch, PC &amp; Mobile Keyboard"
+                                        <TextBlock x:Name="TxtStatusRow1" Grid.Column="2" Text="DXGI + NVENC H.264 Stream, Window Capture, WASAPI Audio, Live Channel Toggle, USB ADB / Tethering, Wi-Fi Android Chrome, View Only / Trackpad / Touch, PC &amp; Mobile Keyboard"
                                                    FontSize="12.5" Foreground="#E2E8F0" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                     </Grid>
 

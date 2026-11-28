@@ -24,12 +24,15 @@ namespace PhoneDisplay.Host.UI;
 public partial class MainWindow : Window
 {
     private readonly DisplayManager _displayManager = new();
+    private readonly AppConfig _startupConfig;
     private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromMilliseconds(2400) };
-    private readonly int _httpPort = 8080;
-    private readonly int _httpsPort = 8443;
+    private readonly int _httpPort;
+    private readonly int _httpsPort;
 
     private List<MonitorInfo> _monitors = new();
+    private List<WindowInfo> _windows = new();
+    private List<AudioDeviceInfo> _audioDevices = new();
     private AdbHelper? _adbHelper;
     private X509Certificate2? _lanCert;
 
@@ -42,14 +45,20 @@ public partial class MainWindow : Window
     private AppLanguage _lang = AppLanguage.Vi;
 
     // Active streaming state
+    private readonly object _videoLock = new();
+    private readonly object _audioLock = new();
+    private bool _isUiInitializing = true;
     private bool _isStreaming;
+    private volatile bool _videoEnabled = true;
     private CancellationTokenSource? _streamCts;
     private Task? _captureTask;
-    private ScreenCapturer? _capturer;
+    private IVideoCapturer? _videoCapturer;
+    private AudioCapturer? _audioCapturer;
     private VideoEncoder? _encoder;
     private StreamingServer? _server;
     private InputInjector? _inputInjector;
     private MonitorInfo? _activeMonitor;
+    private string _activeSourceLabel = string.Empty;
 
     private int _currentTargetFps = 60;
     private int _currentBitrateKbps = 12000;
@@ -60,8 +69,14 @@ public partial class MainWindow : Window
 
     private static string GeneratePin() => RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
-    public MainWindow()
+    public MainWindow(AppConfig? startupConfig = null)
     {
+        _startupConfig = startupConfig ?? new AppConfig();
+        _httpPort = _startupConfig.HttpPort;
+        _httpsPort = _startupConfig.HttpsPort;
+        if (!string.IsNullOrWhiteSpace(_startupConfig.CustomPin))
+            _accessPin = _startupConfig.CustomPin.Trim();
+
         InitializeComponent();
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
@@ -125,13 +140,35 @@ public partial class MainWindow : Window
         }
     }
 
-    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        InitializeTrayIcon();
-        ApplyLanguage();
-        RefreshMonitorList();
-        InitializeNetworkPreview();
-        _adbHelper = new AdbHelper(_httpPort);
+        _isUiInitializing = true;
+        try
+        {
+            InitializeTrayIcon();
+            ChkStreamVideo.IsChecked = _startupConfig.EnableVideo;
+            ChkStreamAudio.IsChecked = _startupConfig.EnableAudio;
+            ChkAllowInput.IsChecked = _startupConfig.AllowRemoteInput;
+            ChkAutoRes.IsChecked = _startupConfig.AutoMatchResolution;
+            ApplyLanguage();
+            RefreshAllSources();
+            SelectComboBoxByIntTag(CmbFps, _startupConfig.TargetFps);
+            SelectComboBoxByIntTag(CmbBitrate, _startupConfig.BitrateKbps);
+            if (_startupConfig.MonitorIndex is int monIdx && monIdx >= 0 && monIdx < CmbMonitor.Items.Count)
+                CmbMonitor.SelectedIndex = monIdx;
+            UpdateSourceSelectorVisibility();
+            InitializeNetworkPreview();
+            _adbHelper = new AdbHelper(_httpPort);
+        }
+        finally
+        {
+            _isUiInitializing = false;
+        }
+
+        if (_startupConfig.AutoStart)
+        {
+            await StartStreamingAsync();
+        }
     }
 
     private void InitializeTrayIcon()
@@ -200,7 +237,7 @@ public partial class MainWindow : Window
     {
         _lang = _lang == AppLanguage.Vi ? AppLanguage.En : AppLanguage.Vi;
         ApplyLanguage();
-        RefreshMonitorList();
+        RefreshAllSources();
         ShowToast(AppStrings.Get(_lang, "ToastLangChanged"));
     }
 
@@ -221,8 +258,16 @@ public partial class MainWindow : Window
 
         TxtStreamTitle.Text = S("StreamTitle");
         TxtStreamSub.Text = S("StreamSub");
-        TxtTargetMonitor.Text = S("TargetMonitor");
+        TxtChannelsLabel.Text = S("ChannelsLabel");
+        ChkStreamVideo.Content = S("StreamVideo");
+        ChkStreamAudio.Content = S("StreamAudioShort");
+        ChkAllowInput.Content = S("AllowInput");
+        TxtVideoSourceTypeLabel.Text = S("VideoSourceTypeLabel");
+        CmbSrcMonitor.Content = S("SourceTypeMonitor");
+        CmbSrcWindow.Content = S("SourceTypeWindow");
+        TxtTargetMonitor.Text = IsWindowSourceSelected() ? S("TargetWindow") : S("TargetMonitor");
         BtnRefreshMonitors.Content = S("Refresh");
+        TxtAudioDeviceLabel.Text = S("AudioDeviceLabel");
         TxtFpsLabel.Text = S("FpsLabel");
         TxtBitrateLabel.Text = S("BitrateLabel");
         TxtEncoderLabel.Text = S("EncoderLabel");
@@ -383,13 +428,44 @@ public partial class MainWindow : Window
         return bmp;
     }
 
+    private bool IsWindowSourceSelected() =>
+        CmbVideoSourceType?.SelectedItem is ComboBoxItem item &&
+        string.Equals(item.Tag?.ToString(), "window", StringComparison.Ordinal);
+
+    private void UpdateSourceSelectorVisibility()
+    {
+        bool win = IsWindowSourceSelected();
+        CmbMonitor.Visibility = win ? Visibility.Collapsed : Visibility.Visible;
+        CmbWindow.Visibility = win ? Visibility.Visible : Visibility.Collapsed;
+        TxtTargetMonitor.Text = AppStrings.Get(_lang, win ? "TargetWindow" : "TargetMonitor");
+    }
+
+    private void RefreshAllSources()
+    {
+        bool prev = _isUiInitializing;
+        _isUiInitializing = true;
+        try
+        {
+            RefreshMonitorList();
+            RefreshWindowList();
+            RefreshAudioDeviceList();
+        }
+        finally
+        {
+            _isUiInitializing = prev;
+        }
+    }
+
     private void RefreshMonitorList()
     {
-        int selectedBefore = CmbMonitor.SelectedIndex;
+        int? selectedIdxBefore = (CmbMonitor.SelectedItem as ComboBoxItem)?.Tag is MonitorInfo prevMon
+            ? prevMon.Index
+            : null;
         _monitors = _displayManager.EnumerateMonitors().ToList();
         CmbMonitor.Items.Clear();
 
         int defaultIdx = 0;
+        int restoredIdx = -1;
         for (int i = 0; i < _monitors.Count; i++)
         {
             var m = _monitors[i];
@@ -400,18 +476,99 @@ public partial class MainWindow : Window
                 Tag = m
             };
             CmbMonitor.Items.Add(item);
+            if (selectedIdxBefore.HasValue && m.Index == selectedIdxBefore.Value)
+                restoredIdx = i;
             if (!m.IsPrimary && defaultIdx == 0)
                 defaultIdx = i;
         }
 
         if (CmbMonitor.Items.Count > 0)
-            CmbMonitor.SelectedIndex = selectedBefore >= 0 && selectedBefore < CmbMonitor.Items.Count ? selectedBefore : defaultIdx;
+            CmbMonitor.SelectedIndex = restoredIdx >= 0 ? restoredIdx : defaultIdx;
+    }
+
+    private void RefreshWindowList()
+    {
+        nint prevHandle = (CmbWindow.SelectedItem as ComboBoxItem)?.Tag is WindowInfo prevWin
+            ? prevWin.Handle
+            : nint.Zero;
+
+        _windows = WindowCapturer.EnumerateWindows();
+        CmbWindow.Items.Clear();
+
+        if (_windows.Count == 0)
+        {
+            CmbWindow.Items.Add(new ComboBoxItem
+            {
+                Content = AppStrings.Get(_lang, "NoWindowAvailable"),
+                Tag = null,
+                IsEnabled = false
+            });
+            CmbWindow.SelectedIndex = 0;
+            return;
+        }
+
+        int restoredIdx = 0;
+        for (int i = 0; i < _windows.Count; i++)
+        {
+            var w = _windows[i];
+            string shortTitle = w.Title.Length > 42 ? w.Title[..39] + "..." : w.Title;
+            string label = string.IsNullOrEmpty(w.ProcessName)
+                ? $"{shortTitle} ({w.Width}x{w.Height})"
+                : $"[{w.ProcessName}] {shortTitle} ({w.Width}x{w.Height})";
+
+            CmbWindow.Items.Add(new ComboBoxItem
+            {
+                Content = label,
+                Tag = w
+            });
+            if (prevHandle != nint.Zero && w.Handle == prevHandle)
+                restoredIdx = i;
+        }
+
+        CmbWindow.SelectedIndex = restoredIdx;
+    }
+
+    private void RefreshAudioDeviceList()
+    {
+        string prevId = (CmbAudioDevice.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        _audioDevices = AudioCapturer.EnumerateOutputDevices();
+        CmbAudioDevice.Items.Clear();
+
+        CmbAudioDevice.Items.Add(new ComboBoxItem
+        {
+            Content = AppStrings.Get(_lang, "AudioDefaultDevice"),
+            Tag = ""
+        });
+
+        int restoredIdx = 0;
+        for (int i = 0; i < _audioDevices.Count; i++)
+        {
+            var dev = _audioDevices[i];
+            string suffix = dev.IsDefault ? " ★" : "";
+            CmbAudioDevice.Items.Add(new ComboBoxItem
+            {
+                Content = $"{dev.FriendlyName}{suffix}",
+                Tag = dev.Id
+            });
+
+            if (!string.IsNullOrEmpty(prevId) && string.Equals(dev.Id, prevId, StringComparison.OrdinalIgnoreCase))
+                restoredIdx = i + 1;
+        }
+
+        CmbAudioDevice.SelectedIndex = restoredIdx;
+    }
+
+    private string? GetSelectedAudioDeviceId()
+    {
+        if (CmbAudioDevice.SelectedItem is ComboBoxItem item && item.Tag is string id && !string.IsNullOrWhiteSpace(id))
+            return id;
+        return null;
     }
 
     private void BtnRefreshMonitors_Click(object sender, RoutedEventArgs e)
     {
-        RefreshMonitorList();
-        ShowToast($"{AppStrings.Get(_lang, "ToastMonitorsRefreshed")} ({_monitors.Count})");
+        RefreshAllSources();
+        ShowToast(AppStrings.Get(_lang, "ToastSourcesRefreshed"));
     }
 
     private async void BtnToggleStream_Click(object sender, RoutedEventArgs e)
@@ -422,14 +579,188 @@ public partial class MainWindow : Window
             await StartStreamingAsync();
     }
 
+    private void BroadcastCurrentServerInfo()
+    {
+        if (_server is null) return;
+
+        int w = 1920;
+        int h = 1080;
+        string encName = AppStrings.Get(_lang, "EncoderAudioOnly");
+        lock (_videoLock)
+        {
+            if (_videoEnabled && _encoder is not null)
+            {
+                w = _encoder.Width;
+                h = _encoder.Height;
+                encName = _encoder.ActiveEncoderName;
+            }
+            else if (_videoEnabled && _videoCapturer is not null)
+            {
+                w = _videoCapturer.Width;
+                h = _videoCapturer.Height;
+            }
+        }
+
+        bool audioRunning;
+        int sampleRate;
+        int channels;
+        lock (_audioLock)
+        {
+            audioRunning = _audioCapturer is { IsRunning: true };
+            sampleRate = _audioCapturer?.SampleRate ?? 48000;
+            channels = _audioCapturer?.Channels ?? 2;
+        }
+
+        _server.BroadcastServerInfo(
+            w,
+            h,
+            _currentTargetFps,
+            _currentBitrateKbps,
+            encName,
+            audioRunning,
+            sampleRate,
+            channels,
+            _videoEnabled,
+            _server.AllowRemoteInput,
+            _activeSourceLabel);
+    }
+
+    private void StartOrSwitchVideoPipeline(
+        bool useWindow,
+        MonitorInfo? selectedMonitor,
+        WindowInfo? selectedWindow,
+        string ffmpegPath,
+        PreferredEncoder prefEnc)
+    {
+        lock (_videoLock)
+        {
+            _encoder?.Dispose();
+            _encoder = null;
+            _videoCapturer?.Dispose();
+            _videoCapturer = null;
+
+            if (useWindow)
+            {
+                if (selectedWindow is null)
+                    throw new InvalidOperationException(AppStrings.Get(_lang, "ErrNoWindow"));
+
+                var winCap = new WindowCapturer(selectedWindow.Handle);
+                winCap.BoundsChanged += (l, t, w, h) => _inputInjector?.UpdateMonitorBounds(l, t, w, h);
+                winCap.ResolutionChanged += (newW, newH) =>
+                {
+                    _encoder?.Reconfigure(newW, newH, _currentTargetFps, _currentBitrateKbps);
+                    BroadcastCurrentServerInfo();
+                };
+                _inputInjector?.UpdateMonitorBounds(winCap.Left, winCap.Top, winCap.Width, winCap.Height);
+                _activeMonitor = null;
+                _activeSourceLabel = string.IsNullOrEmpty(selectedWindow.ProcessName)
+                    ? selectedWindow.Title
+                    : $"{selectedWindow.ProcessName} — {selectedWindow.Title}";
+                _videoCapturer = winCap;
+            }
+            else
+            {
+                if (selectedMonitor is null)
+                    throw new InvalidOperationException(AppStrings.Get(_lang, "ErrNoMonitor"));
+
+                var screenCap = new ScreenCapturer(selectedMonitor);
+                screenCap.ResolutionChanged += (newW, newH) =>
+                {
+                    if (_activeMonitor is null) return;
+                    var updated = _displayManager.GetMonitorByIndex(_activeMonitor.Index);
+                    if (updated is not null)
+                    {
+                        _activeMonitor = updated;
+                        _inputInjector?.UpdateMonitorBounds(updated.Left, updated.Top, updated.Width, updated.Height);
+                    }
+                    _encoder?.Reconfigure(newW, newH, _currentTargetFps, _currentBitrateKbps);
+                    BroadcastCurrentServerInfo();
+                };
+                _inputInjector?.UpdateMonitorBounds(selectedMonitor.Left, selectedMonitor.Top, selectedMonitor.Width, selectedMonitor.Height);
+                _activeMonitor = selectedMonitor;
+                _activeSourceLabel = selectedMonitor.DeviceName;
+                _videoCapturer = screenCap;
+            }
+
+            _encoder = new VideoEncoder(
+                ffmpegPath,
+                prefEnc,
+                _videoCapturer.Width,
+                _videoCapturer.Height,
+                _currentTargetFps,
+                _currentBitrateKbps);
+
+            _encoder.OnEncodedFrame += (nalUnit, isKeyframe, tsUs, encUs) =>
+            {
+                if (!_videoEnabled) return;
+                byte[] packet = VideoPacketBuilder.Build(isKeyframe, tsUs, encUs, nalUnit);
+                _server?.BroadcastVideoFrame(packet, isKeyframe);
+            };
+        }
+    }
+
+    private bool StartOrSwitchAudioPipeline(bool enableAudio, string? deviceId)
+    {
+        lock (_audioLock)
+        {
+            _audioCapturer?.Dispose();
+            _audioCapturer = null;
+
+            if (!enableAudio)
+                return true;
+
+            var cap = new AudioCapturer(deviceId);
+            cap.OnAudioCaptured += (pcm16, sampleRate, channels, tsUs) =>
+            {
+                if (_server is { ConnectedClientCount: > 0 })
+                {
+                    byte[] pkt = AudioPacketBuilder.Build(sampleRate, channels, tsUs, pcm16);
+                    _server.BroadcastAudioFrame(pkt);
+                }
+            };
+            cap.Start();
+            if (!cap.IsRunning)
+            {
+                cap.Dispose();
+                return false;
+            }
+
+            _audioCapturer = cap;
+            return true;
+        }
+    }
+
     private async Task StartStreamingAsync()
     {
         HideError();
 
-        if (CmbMonitor.SelectedItem is not ComboBoxItem monItem || monItem.Tag is not MonitorInfo selectedMonitor)
+        bool wantVideo = ChkStreamVideo.IsChecked == true;
+        bool wantAudio = ChkStreamAudio.IsChecked == true;
+        bool wantInput = ChkAllowInput.IsChecked == true;
+
+        if (!wantVideo && !wantAudio)
         {
-            ShowError(AppStrings.Get(_lang, "ErrNoMonitor"));
+            ShowError(AppStrings.Get(_lang, "ErrNothingEnabled"));
+            ShowToast(AppStrings.Get(_lang, "ErrNothingEnabled"), isWarning: true);
             return;
+        }
+
+        bool useWindow = IsWindowSourceSelected();
+        MonitorInfo? selectedMonitor = (CmbMonitor.SelectedItem as ComboBoxItem)?.Tag as MonitorInfo;
+        WindowInfo? selectedWindow = (CmbWindow.SelectedItem as ComboBoxItem)?.Tag as WindowInfo;
+
+        if (wantVideo)
+        {
+            if (useWindow && selectedWindow is null)
+            {
+                ShowError(AppStrings.Get(_lang, "ErrNoWindow"));
+                return;
+            }
+            if (!useWindow && selectedMonitor is null)
+            {
+                ShowError(AppStrings.Get(_lang, "ErrNoMonitor"));
+                return;
+            }
         }
 
         string clientPath = ResolveClientDirectory();
@@ -443,16 +774,20 @@ public partial class MainWindow : Window
         _currentBitrateKbps = GetSelectedIntTag(CmbBitrate, 12000);
         PreferredEncoder prefEnc = GetSelectedEncoder();
         bool autoRes = ChkAutoRes.IsChecked == true;
+        string? audioDeviceId = GetSelectedAudioDeviceId();
 
         var config = new AppConfig
         {
-            MonitorIndex = selectedMonitor.Index,
+            MonitorIndex = selectedMonitor?.Index,
             TargetFps = _currentTargetFps,
             BitrateKbps = _currentBitrateKbps,
             HttpPort = _httpPort,
             HttpsPort = _httpsPort,
             Encoder = prefEnc,
-            AutoMatchResolution = autoRes
+            AutoMatchResolution = autoRes,
+            EnableVideo = wantVideo,
+            EnableAudio = wantAudio,
+            AllowRemoteInput = wantInput
         };
 
         try
@@ -460,42 +795,32 @@ public partial class MainWindow : Window
             SetControlsEnabled(false);
             SetStatusBadge(AppStrings.Get(_lang, "StatusStarting"), MediaColor.FromRgb(251, 191, 36));
 
-            _activeMonitor = selectedMonitor;
-            _inputInjector = new InputInjector(selectedMonitor);
-            _capturer = new ScreenCapturer(selectedMonitor);
-            _encoder = new VideoEncoder(
-                config.FfmpegPath,
-                config.Encoder,
-                _capturer.Width,
-                _capturer.Height,
-                _currentTargetFps,
-                _currentBitrateKbps);
+            _inputInjector = selectedMonitor is not null
+                ? new InputInjector(selectedMonitor)
+                : new InputInjector(0, 0, 1920, 1080);
 
             _lanCert ??= SelfSignedCertGenerator.LoadOrCreateCertificate(SelfSignedCertGenerator.GetLocalIPv4Addresses());
-            _server = new StreamingServer(config, clientPath, _lanCert, _inputInjector, _accessPin);
-
-            _encoder.OnEncodedFrame += (nalUnit, isKeyframe, tsUs, encUs) =>
+            _server = new StreamingServer(config, clientPath, _lanCert, _inputInjector, _accessPin)
             {
-                byte[] packet = VideoPacketBuilder.Build(isKeyframe, tsUs, encUs, nalUnit);
-                _server?.BroadcastVideoFrame(packet, isKeyframe);
+                AllowRemoteInput = wantInput
             };
 
-            _capturer.ResolutionChanged += (newW, newH) =>
+            _videoEnabled = wantVideo;
+            if (wantVideo)
             {
-                if (_activeMonitor is null) return;
-                var updated = _displayManager.GetMonitorByIndex(_activeMonitor.Index);
-                if (updated is not null)
-                {
-                    _activeMonitor = updated;
-                    _inputInjector?.UpdateMonitorBounds(updated.Left, updated.Top, updated.Width, updated.Height);
-                }
-                _encoder?.Reconfigure(newW, newH, _currentTargetFps, _currentBitrateKbps);
-                _server?.BroadcastServerInfo(newW, newH, _currentTargetFps, _currentBitrateKbps, _encoder?.ActiveEncoderName ?? "");
-            };
+                StartOrSwitchVideoPipeline(useWindow, selectedMonitor, selectedWindow, config.FfmpegPath, config.Encoder);
+            }
+            else
+            {
+                _activeMonitor = null;
+                _activeSourceLabel = AppStrings.Get(_lang, "EncoderAudioOnly");
+            }
+
+            bool audioUnavailable = wantAudio && !StartOrSwitchAudioPipeline(true, audioDeviceId);
 
             _server.OnClientHello += (phoneW, phoneH, _) =>
             {
-                if (autoRes && _activeMonitor is not null && _capturer is not null)
+                if (_videoEnabled && autoRes && _activeMonitor is not null && !useWindow)
                 {
                     var (changed, matchedW, matchedH, _) = _displayManager.TryMatchResolution(
                         _activeMonitor,
@@ -512,16 +837,14 @@ public partial class MainWindow : Window
                             _activeMonitor = refreshed;
                             _inputInjector?.UpdateMonitorBounds(refreshed.Left, refreshed.Top, refreshed.Width, refreshed.Height);
                         }
-                        _encoder?.Reconfigure(matchedW, matchedH, _currentTargetFps, _currentBitrateKbps);
+                        lock (_videoLock)
+                        {
+                            _encoder?.Reconfigure(matchedW, matchedH, _currentTargetFps, _currentBitrateKbps);
+                        }
                     }
                 }
 
-                _server?.BroadcastServerInfo(
-                    _encoder?.Width ?? _capturer?.Width ?? 1920,
-                    _encoder?.Height ?? _capturer?.Height ?? 1080,
-                    _currentTargetFps,
-                    _currentBitrateKbps,
-                    _encoder?.ActiveEncoderName ?? "");
+                BroadcastCurrentServerInfo();
             };
 
             _server.OnRuntimeConfigRequested += (reqFps, reqBitrate) =>
@@ -529,11 +852,14 @@ public partial class MainWindow : Window
                 if (reqFps.HasValue) _currentTargetFps = Math.Clamp(reqFps.Value, 15, 120);
                 if (reqBitrate.HasValue) _currentBitrateKbps = Math.Clamp(reqBitrate.Value, 1000, 80000);
 
-                if (_capturer is not null && _encoder is not null)
+                lock (_videoLock)
                 {
-                    _encoder.Reconfigure(_capturer.Width, _capturer.Height, _currentTargetFps, _currentBitrateKbps);
-                    _server?.BroadcastServerInfo(_encoder.Width, _encoder.Height, _currentTargetFps, _currentBitrateKbps, _encoder.ActiveEncoderName);
+                    if (_videoCapturer is not null && _encoder is not null)
+                    {
+                        _encoder.Reconfigure(_videoCapturer.Width, _videoCapturer.Height, _currentTargetFps, _currentBitrateKbps);
+                    }
                 }
+                BroadcastCurrentServerInfo();
             };
 
             _server.OnKeyframeRequested += () => _encoder?.ForceKeyframe();
@@ -548,12 +874,144 @@ public partial class MainWindow : Window
             BtnToggleStream.Background = new SolidColorBrush(MediaColor.FromRgb(220, 38, 38));
             if (_trayToggleItem is not null) _trayToggleItem.Text = AppStrings.Get(_lang, "BtnStop");
             SetStatusBadge(AppStrings.Get(_lang, "StatusStreaming"), MediaColor.FromRgb(52, 211, 153));
-            ShowToast($"{AppStrings.Get(_lang, "ToastStreamStarted")} ({selectedMonitor.DeviceName})");
+            if (audioUnavailable)
+                ShowToast(AppStrings.Get(_lang, "ToastAudioUnavailable"), isWarning: true);
+            else
+                ShowToast($"{AppStrings.Get(_lang, "ToastStreamStarted")} ({_activeSourceLabel})");
         }
         catch (Exception ex)
         {
             ShowError($"{AppStrings.Get(_lang, "ErrStartFailed")}: {ex.Message}");
             await StopStreamingAsync();
+        }
+    }
+
+    private void ChkStreamVideo_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isUiInitializing || !_isStreaming) return;
+
+        bool enable = ChkStreamVideo.IsChecked == true;
+        if (enable)
+        {
+            bool useWindow = IsWindowSourceSelected();
+            MonitorInfo? mon = (CmbMonitor.SelectedItem as ComboBoxItem)?.Tag as MonitorInfo;
+            WindowInfo? win = (CmbWindow.SelectedItem as ComboBoxItem)?.Tag as WindowInfo;
+
+            try
+            {
+                HideError();
+                StartOrSwitchVideoPipeline(useWindow, mon, win, _startupConfig.FfmpegPath, GetSelectedEncoder());
+                _videoEnabled = true;
+                _encoder?.ForceKeyframe();
+                BroadcastCurrentServerInfo();
+                ShowToast(AppStrings.Get(_lang, "ToastVideoOn"));
+            }
+            catch (Exception ex)
+            {
+                _videoEnabled = false;
+                _isUiInitializing = true;
+                ChkStreamVideo.IsChecked = false;
+                _isUiInitializing = false;
+                ShowError(ex.Message);
+            }
+        }
+        else
+        {
+            _videoEnabled = false;
+            lock (_videoLock)
+            {
+                _encoder?.Dispose();
+                _encoder = null;
+                _videoCapturer?.Dispose();
+                _videoCapturer = null;
+            }
+            _activeSourceLabel = AppStrings.Get(_lang, "EncoderAudioOnly");
+            _measuredFps = 0;
+            BroadcastCurrentServerInfo();
+            ShowToast(AppStrings.Get(_lang, "ToastVideoOff"), isWarning: true);
+        }
+    }
+
+    private void ChkStreamAudio_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isUiInitializing || !_isStreaming) return;
+
+        bool enable = ChkStreamAudio.IsChecked == true;
+        bool ok = StartOrSwitchAudioPipeline(enable, GetSelectedAudioDeviceId());
+        BroadcastCurrentServerInfo();
+
+        if (enable && !ok)
+            ShowToast(AppStrings.Get(_lang, "ToastAudioUnavailable"), isWarning: true);
+        else
+            ShowToast(AppStrings.Get(_lang, enable ? "ToastAudioOn" : "ToastAudioOff"), isWarning: !enable);
+    }
+
+    private void ChkAllowInput_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isUiInitializing || !_isStreaming || _server is null) return;
+
+        bool allow = ChkAllowInput.IsChecked == true;
+        _server.AllowRemoteInput = allow;
+        BroadcastCurrentServerInfo();
+        ShowToast(AppStrings.Get(_lang, allow ? "ToastInputOn" : "ToastInputOff"), isWarning: !allow);
+    }
+
+    private void CmbAudioDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUiInitializing || !_isStreaming || ChkStreamAudio.IsChecked != true) return;
+
+        bool ok = StartOrSwitchAudioPipeline(true, GetSelectedAudioDeviceId());
+        BroadcastCurrentServerInfo();
+        if (!ok)
+            ShowToast(AppStrings.Get(_lang, "ToastAudioUnavailable"), isWarning: true);
+        else
+            ShowToast(AppStrings.Get(_lang, "ToastAudioDeviceChanged"));
+    }
+
+    private void CmbVideoSourceType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUiInitializing) return;
+
+        UpdateSourceSelectorVisibility();
+        if (IsWindowSourceSelected())
+        {
+            bool prev = _isUiInitializing;
+            _isUiInitializing = true;
+            RefreshWindowList();
+            _isUiInitializing = prev;
+        }
+
+        HotSwitchVideoSourceIfStreaming();
+    }
+
+    private void CmbVideoTarget_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUiInitializing) return;
+        HotSwitchVideoSourceIfStreaming();
+    }
+
+    private void HotSwitchVideoSourceIfStreaming()
+    {
+        if (!_isStreaming || !_videoEnabled) return;
+
+        bool useWindow = IsWindowSourceSelected();
+        MonitorInfo? mon = (CmbMonitor.SelectedItem as ComboBoxItem)?.Tag as MonitorInfo;
+        WindowInfo? win = (CmbWindow.SelectedItem as ComboBoxItem)?.Tag as WindowInfo;
+
+        if ((useWindow && win is null) || (!useWindow && mon is null))
+            return;
+
+        try
+        {
+            HideError();
+            StartOrSwitchVideoPipeline(useWindow, mon, win, _startupConfig.FfmpegPath, GetSelectedEncoder());
+            _encoder?.ForceKeyframe();
+            BroadcastCurrentServerInfo();
+            ShowToast($"{AppStrings.Get(_lang, "ToastSourceChanged")}: {_activeSourceLabel}");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
         }
     }
 
@@ -568,17 +1026,26 @@ public partial class MainWindow : Window
             _captureTask = null;
         }
 
+        lock (_audioLock)
+        {
+            _audioCapturer?.Dispose();
+            _audioCapturer = null;
+        }
+
         if (_server is not null)
         {
             try { await _server.DisposeAsync(); } catch { }
             _server = null;
         }
 
-        _encoder?.Dispose();
-        _encoder = null;
+        lock (_videoLock)
+        {
+            _encoder?.Dispose();
+            _encoder = null;
 
-        _capturer?.Dispose();
-        _capturer = null;
+            _videoCapturer?.Dispose();
+            _videoCapturer = null;
+        }
 
         _streamCts?.Dispose();
         _streamCts = null;
@@ -628,20 +1095,29 @@ public partial class MainWindow : Window
             }
             nextFrameTs = Math.Max(nextFrameTs + (long)frameIntervalTicks, Stopwatch.GetTimestamp());
 
-            if (_server is { ConnectedClientCount: > 0 } && _capturer is not null && _encoder is not null)
+            bool submitted = false;
+            if (_videoEnabled && _server is { ConnectedClientCount: > 0 })
             {
-                int timeoutMs = Math.Max(4, (int)(1000.0 / targetFps));
-                if (_capturer.TryCaptureFrame(timeoutMs, out var bgra, out _))
+                lock (_videoLock)
                 {
-                    if (_encoder.TrySubmitFrame(bgra))
+                    if (_videoCapturer is not null && _encoder is not null)
                     {
-                        framesInWindow++;
+                        int timeoutMs = Math.Max(4, (int)(1000.0 / targetFps));
+                        if (_videoCapturer.TryCaptureFrame(timeoutMs, out var bgra, out _))
+                        {
+                            if (_encoder.TrySubmitFrame(bgra))
+                            {
+                                framesInWindow++;
+                                submitted = true;
+                            }
+                        }
                     }
                 }
             }
-            else
+
+            if (!submitted)
             {
-                Thread.Sleep(50);
+                Thread.Sleep(35);
                 nextFrameTs = Stopwatch.GetTimestamp();
             }
 
@@ -689,17 +1165,28 @@ public partial class MainWindow : Window
             }
         }
 
-        if (_isStreaming && _encoder is not null && _server is not null)
+        if (_isStreaming && _server is not null)
         {
-            StatFps.Text = $"{_measuredFps:F0} / {_currentTargetFps}";
-            StatEncMs.Text = $"{_encoder.LastEncodeLatencyMs:F1} ms";
-            StatBitrate.Text = $"{_encoder.CurrentBitrateMbps:F1} Mbps";
             StatClients.Text = $"{_server.ConnectedClientCount} {AppStrings.Get(_lang, "ClientsSuffix")}";
-            StatEncoder.Text = _encoder.ActiveEncoderName;
 
-            if (!string.IsNullOrEmpty(_encoder.LastError) && TxtErrorBanner.Visibility != Visibility.Visible)
+            if (_videoEnabled && _encoder is not null)
             {
-                ShowError(_encoder.LastError);
+                StatFps.Text = $"{_measuredFps:F0} / {_currentTargetFps}";
+                StatEncMs.Text = $"{_encoder.LastEncodeLatencyMs:F1} ms";
+                StatBitrate.Text = $"{_encoder.CurrentBitrateMbps:F1} Mbps";
+                StatEncoder.Text = _encoder.ActiveEncoderName;
+
+                if (!string.IsNullOrEmpty(_encoder.LastError) && TxtErrorBanner.Visibility != Visibility.Visible)
+                {
+                    ShowError(_encoder.LastError);
+                }
+            }
+            else
+            {
+                StatFps.Text = "--";
+                StatEncMs.Text = "--";
+                StatBitrate.Text = "--";
+                StatEncoder.Text = AppStrings.Get(_lang, "EncoderAudioOnly");
             }
         }
         else
@@ -737,8 +1224,6 @@ public partial class MainWindow : Window
 
     private void SetControlsEnabled(bool enabled)
     {
-        CmbMonitor.IsEnabled = enabled;
-        BtnRefreshMonitors.IsEnabled = enabled;
         CmbFps.IsEnabled = enabled;
         CmbBitrate.IsEnabled = enabled;
         CmbEncoder.IsEnabled = enabled;
@@ -762,6 +1247,18 @@ public partial class MainWindow : Window
         if (cmb.SelectedItem is ComboBoxItem item && item.Tag is string s && int.TryParse(s, out int val))
             return val;
         return fallback;
+    }
+
+    private static void SelectComboBoxByIntTag(System.Windows.Controls.ComboBox cmb, int value)
+    {
+        foreach (var obj in cmb.Items)
+        {
+            if (obj is ComboBoxItem item && item.Tag is string s && int.TryParse(s, out int v) && v == value)
+            {
+                cmb.SelectedItem = item;
+                return;
+            }
+        }
     }
 
     private PreferredEncoder GetSelectedEncoder()
