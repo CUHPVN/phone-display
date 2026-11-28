@@ -65,17 +65,14 @@ public partial class MainWindow : Window
     private double _measuredFps;
     private string _lastIpSignature = string.Empty;
     private int _networkCheckTicks;
-    private string _accessPin = GeneratePin();
-
-    private static string GeneratePin() => RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+    private string _accessPin = string.Empty;
 
     public MainWindow(AppConfig? startupConfig = null)
     {
         _startupConfig = startupConfig ?? new AppConfig();
         _httpPort = _startupConfig.HttpPort;
         _httpsPort = _startupConfig.HttpsPort;
-        if (!string.IsNullOrWhiteSpace(_startupConfig.CustomPin))
-            _accessPin = _startupConfig.CustomPin.Trim();
+        _accessPin = PinStore.LoadOrCreate(_startupConfig.CustomPin);
 
         InitializeComponent();
         Loaded += MainWindow_Loaded;
@@ -369,7 +366,7 @@ public partial class MainWindow : Window
             ShowToast(AppStrings.Get(_lang, "ToastStopToRotatePin"), isWarning: true);
             return;
         }
-        _accessPin = GeneratePin();
+        _accessPin = PinStore.Rotate(_accessPin);
         InitializeNetworkPreview();
         ShowToast($"{AppStrings.Get(_lang, "ToastPinChanged")}: {_accessPin}");
         await FlashButtonTextAsync(BtnRotatePin, AppStrings.Get(_lang, "Copied").Contains("copy") ? "OK" : "Done");
