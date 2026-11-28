@@ -25,6 +25,8 @@ public partial class MainWindow : Window
 {
     private readonly DisplayManager _displayManager = new();
     private readonly AppConfig _startupConfig;
+    private readonly DeviceRegistry _deviceRegistry = new();
+    private readonly string? _bootstrapToken;
     private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromMilliseconds(2400) };
     private readonly int _httpPort;
@@ -66,14 +68,16 @@ public partial class MainWindow : Window
     private double _measuredFps;
     private string _lastIpSignature = string.Empty;
     private int _networkCheckTicks;
-    private string _accessPin = string.Empty;
+    private string? _quickPendingDeviceId;
 
     public MainWindow(AppConfig? startupConfig = null)
     {
         _startupConfig = startupConfig ?? new AppConfig();
         _httpPort = _startupConfig.HttpPort;
         _httpsPort = _startupConfig.HttpsPort;
-        _accessPin = PinStore.LoadOrCreate(_startupConfig.CustomPin);
+        _bootstrapToken = string.IsNullOrWhiteSpace(_startupConfig.CustomPin)
+            ? null
+            : _startupConfig.CustomPin.Trim();
 
         InitializeComponent();
         Loaded += MainWindow_Loaded;
@@ -156,6 +160,7 @@ public partial class MainWindow : Window
                 CmbMonitor.SelectedIndex = monIdx;
             UpdateSourceSelectorVisibility();
             InitializeNetworkPreview();
+            RefreshDevicesUi();
             _adbHelper = new AdbHelper(_httpPort);
         }
         finally
@@ -214,15 +219,16 @@ public partial class MainWindow : Window
 
         PageStream.Visibility = tabIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
         PageConnect.Visibility = tabIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
-        PageSettings.Visibility = tabIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
-        PageStatus.Visibility = tabIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
+        PageDevices.Visibility = tabIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
+        PageSettings.Visibility = tabIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
+        PageStatus.Visibility = tabIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
 
         var activeBg = new SolidColorBrush(MediaColor.FromRgb(26, 34, 51));
         var activeFg = new SolidColorBrush(MediaColor.FromRgb(255, 255, 255));
         var inactiveBg = System.Windows.Media.Brushes.Transparent;
         var inactiveFg = new SolidColorBrush(MediaColor.FromRgb(148, 163, 184));
 
-        System.Windows.Controls.Button[] navs = [BtnNavStream, BtnNavConnect, BtnNavSettings, BtnNavStatus];
+        System.Windows.Controls.Button[] navs = [BtnNavStream, BtnNavConnect, BtnNavDevices, BtnNavSettings, BtnNavStatus];
         for (int i = 0; i < navs.Length; i++)
         {
             bool active = i == tabIndex;
@@ -236,6 +242,7 @@ public partial class MainWindow : Window
         _lang = _lang == AppLanguage.Vi ? AppLanguage.En : AppLanguage.Vi;
         ApplyLanguage();
         RefreshAllSources();
+        RefreshDevicesUi();
         ShowToast(AppStrings.Get(_lang, "ToastLangChanged"));
     }
 
@@ -251,8 +258,15 @@ public partial class MainWindow : Window
 
         TxtNavStream.Text = S("NavStream");
         TxtNavConnect.Text = S("NavConnect");
+        TxtNavDevices.Text = S("NavDevices");
         TxtNavSettings.Text = S("NavSettings");
         TxtNavStatus.Text = S("NavStatus");
+        TxtSidebarDevicesHeader.Text = S("SidebarDevicesHeader");
+
+        TxtPendingAlertTitle.Text = S("PendingAlertTitle");
+        BtnQuickApprove.Content = S("BtnApprove");
+        BtnQuickDeny.Content = S("BtnDeny");
+        BtnQuickBan.Content = S("BtnBan");
 
         TxtStreamTitle.Text = S("StreamTitle");
         TxtStreamSub.Text = S("StreamSub");
@@ -283,13 +297,24 @@ public partial class MainWindow : Window
 
         TxtConnectTitle.Text = S("ConnectTitle");
         TxtConnectSub.Text = S("ConnectSub");
-        BtnRotatePin.Content = S("RotatePin");
+        TxtApprovalModeBadge.Text = S("ApprovalModeBadge");
         TxtUsbTitle.Text = S("UsbTitle");
         TxtWifiTitle.Text = S("WifiTitle");
         TxtWifiHint.Text = S("WifiHint");
         TxtRadminTitle.Text = S("RadminTitle");
         if (PanelRadmin.Visibility != Visibility.Visible)
             TxtRadminHint.Text = S("RadminNone");
+
+        TxtDevicesTitle.Text = S("DevicesTitle");
+        TxtDevicesSub.Text = S("DevicesSub");
+        TxtSectionPending.Text = S("SectionPending");
+        TxtSectionOnline.Text = S("SectionOnline");
+        TxtSectionApproved.Text = S("SectionApproved");
+        TxtSectionBanned.Text = S("SectionBanned");
+        TxtEmptyPending.Text = S("EmptyPending");
+        TxtEmptyOnline.Text = S("EmptyOnline");
+        TxtEmptyApproved.Text = S("EmptyApproved");
+        TxtEmptyBanned.Text = S("EmptyBanned");
 
         TxtSettingsTitle.Text = S("SettingsTitle");
         TxtSettingsSub.Text = S("SettingsSub");
@@ -360,19 +385,6 @@ public partial class MainWindow : Window
     private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
 
-    private async void BtnRotatePin_Click(object sender, RoutedEventArgs e)
-    {
-        if (_isStreaming)
-        {
-            ShowToast(AppStrings.Get(_lang, "ToastStopToRotatePin"), isWarning: true);
-            return;
-        }
-        _accessPin = PinStore.Rotate(_accessPin);
-        InitializeNetworkPreview();
-        ShowToast($"{AppStrings.Get(_lang, "ToastPinChanged")}: {_accessPin}");
-        await FlashButtonTextAsync(BtnRotatePin, AppStrings.Get(_lang, "Copied").Contains("copy") ? "OK" : "Done");
-    }
-
     private void InitializeNetworkPreview()
     {
         var lanIps = SelfSignedCertGenerator.GetLocalIPv4Addresses();
@@ -381,24 +393,22 @@ public partial class MainWindow : Window
         _lanCert = SelfSignedCertGenerator.LoadOrCreateCertificate(lanIps);
 
         string lanUrl = lanIps.Count > 0
-            ? $"https://{lanIps[0]}:{_httpsPort}/?token={_accessPin}"
-            : $"https://127.0.0.1:{_httpsPort}/?token={_accessPin}";
+            ? $"https://{lanIps[0]}:{_httpsPort}"
+            : $"https://127.0.0.1:{_httpsPort}";
 
         var usbIp = SelfSignedCertGenerator.GetUsbTetheringIPv4Address();
         string usbUrl = usbIp is not null
-            ? $"https://{usbIp}:{_httpsPort}/?token={_accessPin}"
-            : $"http://localhost:{_httpPort}/?token={_accessPin}";
+            ? $"https://{usbIp}:{_httpsPort}"
+            : $"http://localhost:{_httpPort}";
         TxtUsbUrl.Text = usbUrl;
         ImgUsbQrCode.Source = GenerateQrBitmap(usbUrl);
         TxtLanUrl.Text = lanUrl;
-        TxtAccessPin.Text = $"PIN: {_accessPin}";
-        TxtSidebarPin.Text = _accessPin;
         ImgQrCode.Source = GenerateQrBitmap(lanUrl);
 
         var vpnIp = SelfSignedCertGenerator.GetRadminOrVpnIPv4Address();
         if (vpnIp is not null)
         {
-            TxtVpnUrl.Text = $"https://{vpnIp}:{_httpsPort}/?token={_accessPin}";
+            TxtVpnUrl.Text = $"https://{vpnIp}:{_httpsPort}";
             TxtRadminHint.Text = vpnIp.ToString();
             PanelRadmin.Visibility = Visibility.Visible;
         }
@@ -798,10 +808,12 @@ public partial class MainWindow : Window
                 : new InputInjector(0, 0, 1920, 1080);
 
             _lanCert ??= SelfSignedCertGenerator.LoadOrCreateCertificate(SelfSignedCertGenerator.GetLocalIPv4Addresses());
-            _server = new StreamingServer(config, clientPath, _lanCert, _inputInjector, _accessPin)
+            _server = new StreamingServer(config, clientPath, _lanCert, _inputInjector, _deviceRegistry, _bootstrapToken)
             {
                 AllowRemoteInput = wantInput
             };
+            _server.OnDevicesChanged += () => Dispatcher.BeginInvoke(RefreshDevicesUi);
+            _server.OnPendingRequestArrived += info => Dispatcher.BeginInvoke(() => OnPendingRequestArrivedUi(info));
 
             _videoEnabled = wantVideo;
             if (wantVideo)
@@ -818,7 +830,7 @@ public partial class MainWindow : Window
 
             _server.OnClientHello += (phoneW, phoneH, _) =>
             {
-                if (_videoEnabled && autoRes && _activeMonitor is not null && !useWindow)
+                if (_videoEnabled && autoRes && _activeMonitor is not null && !useWindow && (_server?.ConnectedClientCount ?? 0) <= 1)
                 {
                     var (changed, matchedW, matchedH, _) = _displayManager.TryMatchResolution(
                         _activeMonitor,
@@ -882,6 +894,8 @@ public partial class MainWindow : Window
                 ShowToast(AppStrings.Get(_lang, "ToastAudioUnavailable"), isWarning: true);
             else
                 ShowToast($"{AppStrings.Get(_lang, "ToastStreamStarted")} ({_activeSourceLabel})");
+
+            RefreshDevicesUi();
         }
         catch (Exception ex)
         {
@@ -1066,6 +1080,7 @@ public partial class MainWindow : Window
         SetStatusBadge(AppStrings.Get(_lang, "StatusReady"), MediaColor.FromRgb(56, 189, 248));
         StatEncoder.Text = AppStrings.Get(_lang, "EncoderIdle");
         StatClients.Text = $"0 {AppStrings.Get(_lang, "ClientsSuffix")}";
+        RefreshDevicesUi();
         ShowToast(AppStrings.Get(_lang, "ToastStreamStopped"));
     }
 
@@ -1169,11 +1184,11 @@ public partial class MainWindow : Window
         if (usbIp is not null)
         {
             TxtUsbStatus.Text = AppStrings.Get(_lang, "UsbTetheringReady");
-            targetUsbUrl = $"https://{usbIp}:{_httpsPort}/?token={_accessPin}";
+            targetUsbUrl = $"https://{usbIp}:{_httpsPort}";
         }
         else
         {
-            targetUsbUrl = $"http://localhost:{_httpPort}/?token={_accessPin}";
+            targetUsbUrl = $"http://localhost:{_httpPort}";
             if (_adbHelper is not null)
                 TxtUsbStatus.Text = _adbHelper.StatusSummary;
         }
@@ -1392,6 +1407,297 @@ public partial class MainWindow : Window
         {
             ShowError(ex.Message);
         }
+    }
+
+    private void OnPendingRequestArrivedUi(PendingDeviceInfo info)
+    {
+        RefreshDevicesUi();
+        ShowToast($"{AppStrings.Get(_lang, "PendingAlertTitle")}: {info.DeviceName} ({info.IpAddress})", isWarning: true);
+        _trayIcon?.ShowBalloonTip(
+            3500,
+            AppStrings.Get(_lang, "TrayPendingBalloon"),
+            $"{info.DeviceName} ({info.IpAddress})",
+            WinForms.ToolTipIcon.Warning);
+    }
+
+    private void BtnQuickApprove_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_quickPendingDeviceId)) return;
+        _server?.ApprovePending(_quickPendingDeviceId);
+        RefreshDevicesUi();
+        ShowToast(AppStrings.Get(_lang, "ToastApproved"));
+    }
+
+    private void BtnQuickDeny_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_quickPendingDeviceId)) return;
+        _server?.DenyPending(_quickPendingDeviceId);
+        RefreshDevicesUi();
+        ShowToast(AppStrings.Get(_lang, "ToastDenied"), isWarning: true);
+    }
+
+    private void BtnQuickBan_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_quickPendingDeviceId)) return;
+        string id = _quickPendingDeviceId;
+        if (_server is not null) _server.BanDevice(id);
+        else _deviceRegistry.Ban(id);
+        RefreshDevicesUi();
+        ShowToast(AppStrings.Get(_lang, "ToastBanned"), isWarning: true);
+    }
+
+    private void RefreshDevicesUi()
+    {
+        var pending = _server?.GetPendingRequests() ?? Array.Empty<PendingDeviceInfo>();
+        var connected = _server?.GetConnectedDevices() ?? Array.Empty<ConnectedDeviceInfo>();
+        var allRecords = _deviceRegistry.GetAll();
+        var onlineIds = connected.Select(c => c.DeviceId).ToHashSet(StringComparer.Ordinal);
+
+        TxtSidebarOnlineCount.Text = $"{connected.Count} {AppStrings.Get(_lang, "ClientsSuffix")}";
+        if (pending.Count > 0)
+        {
+            BadgePendingNav.Visibility = Visibility.Visible;
+            TxtBadgePendingNav.Text = pending.Count.ToString();
+            TxtSidebarPendingCount.Visibility = Visibility.Visible;
+            TxtSidebarPendingCount.Text = $"{pending.Count} {AppStrings.Get(_lang, "SidebarPendingSuffix")}";
+
+            var first = pending[0];
+            _quickPendingDeviceId = first.DeviceId;
+            TxtPendingAlertDevice.Text = $"{first.DeviceName}  •  {first.IpAddress}";
+            if (pending.Count > 1)
+            {
+                TxtPendingAlertMore.Text = string.Format(AppStrings.Get(_lang, "PendingMoreFormat"), pending.Count - 1);
+                TxtPendingAlertMore.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                TxtPendingAlertMore.Visibility = Visibility.Collapsed;
+            }
+            PendingApprovalBanner.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _quickPendingDeviceId = null;
+            BadgePendingNav.Visibility = Visibility.Collapsed;
+            TxtSidebarPendingCount.Visibility = Visibility.Collapsed;
+            PendingApprovalBanner.Visibility = Visibility.Collapsed;
+        }
+
+        // Pending list
+        PanelPendingList.Children.Clear();
+        TxtEmptyPending.Visibility = pending.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var p in pending)
+        {
+            string id = p.DeviceId;
+            var btnApprove = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnApprove"), "#14532D", "#22C55E", "#FFFFFF", () =>
+            {
+                _server?.ApprovePending(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastApproved"));
+            });
+            var btnDeny = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnDeny"), "#1A2130", "#2A354A", "#E2E8F0", () =>
+            {
+                _server?.DenyPending(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastDenied"), isWarning: true);
+            });
+            var btnBan = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnBan"), "#450A0A", "#EF4444", "#FCA5A5", () =>
+            {
+                if (_server is not null) _server.BanDevice(id); else _deviceRegistry.Ban(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastBanned"), isWarning: true);
+            });
+            PanelPendingList.Children.Add(BuildDeviceRow(
+                p.DeviceName,
+                $"{p.IpAddress}  •  {p.RequestedAtUtc.ToLocalTime():HH:mm:ss}",
+                "PENDING",
+                MediaColor.FromRgb(251, 191, 36),
+                btnApprove, btnDeny, btnBan));
+        }
+
+        // Online list
+        PanelOnlineList.Children.Clear();
+        TxtEmptyOnline.Visibility = connected.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var c in connected)
+        {
+            string id = c.DeviceId;
+            string audioTag = c.AudioEnabled ? "🔊" : "🔇";
+            var btnKick = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnKick"), "#1A2130", "#2A354A", "#E2E8F0", () =>
+            {
+                _server?.KickDevice(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastKicked"), isWarning: true);
+            });
+            var btnRevoke = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnRevoke"), "#2A2010", "#F59E0B", "#FDE68A", () =>
+            {
+                if (_server is not null) _server.RevokeDevice(id); else _deviceRegistry.Revoke(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastRevoked"), isWarning: true);
+            });
+            var btnBan = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnBan"), "#450A0A", "#EF4444", "#FCA5A5", () =>
+            {
+                if (_server is not null) _server.BanDevice(id); else _deviceRegistry.Ban(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastBanned"), isWarning: true);
+            });
+            PanelOnlineList.Children.Add(BuildDeviceRow(
+                c.DeviceName,
+                $"{c.IpAddress}  •  {audioTag}  •  {c.ConnectedAtUtc.ToLocalTime():HH:mm:ss}",
+                AppStrings.Get(_lang, "StatusOnline"),
+                MediaColor.FromRgb(74, 222, 128),
+                btnKick, btnRevoke, btnBan));
+        }
+
+        // Approved saved list
+        var approved = allRecords.Where(r => r.Status == DeviceTrustStatus.Approved).ToList();
+        PanelApprovedList.Children.Clear();
+        TxtEmptyApproved.Visibility = approved.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var a in approved)
+        {
+            string id = a.DeviceId;
+            bool isOnline = onlineIds.Contains(id);
+            var btnRevoke = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnRevoke"), "#2A2010", "#F59E0B", "#FDE68A", () =>
+            {
+                if (_server is not null) _server.RevokeDevice(id); else _deviceRegistry.Revoke(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastRevoked"), isWarning: true);
+            });
+            var btnBan = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnBan"), "#450A0A", "#EF4444", "#FCA5A5", () =>
+            {
+                if (_server is not null) _server.BanDevice(id); else _deviceRegistry.Ban(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastBanned"), isWarning: true);
+            });
+            var btnRemove = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnRemove"), "#1A2130", "#2A354A", "#CBD5E1", () =>
+            {
+                if (_server is not null) _server.RemoveDevice(id); else _deviceRegistry.Remove(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastRemoved"));
+            });
+            PanelApprovedList.Children.Add(BuildDeviceRow(
+                a.DeviceName,
+                $"{a.LastIp}  •  {a.LastSeenUtc.ToLocalTime():dd/MM HH:mm}",
+                isOnline ? AppStrings.Get(_lang, "StatusOnline") : AppStrings.Get(_lang, "StatusOffline"),
+                isOnline ? MediaColor.FromRgb(74, 222, 128) : MediaColor.FromRgb(100, 116, 139),
+                btnRevoke, btnBan, btnRemove));
+        }
+
+        // Banned list
+        var banned = allRecords.Where(r => r.Status == DeviceTrustStatus.Banned).ToList();
+        PanelBannedList.Children.Clear();
+        TxtEmptyBanned.Visibility = banned.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var b in banned)
+        {
+            string id = b.DeviceId;
+            var btnUnban = MakeDeviceActionButton(AppStrings.Get(_lang, "BtnUnban"), "#14532D", "#22C55E", "#FFFFFF", () =>
+            {
+                if (_server is not null) _server.UnbanDevice(id); else _deviceRegistry.Unban(id);
+                RefreshDevicesUi();
+                ShowToast(AppStrings.Get(_lang, "ToastUnbanned"));
+            });
+            PanelBannedList.Children.Add(BuildDeviceRow(
+                b.DeviceName,
+                $"{b.LastIp}  •  {b.LastSeenUtc.ToLocalTime():dd/MM HH:mm}",
+                "BANNED",
+                MediaColor.FromRgb(248, 113, 113),
+                btnUnban));
+        }
+    }
+
+    private static System.Windows.Controls.Button MakeDeviceActionButton(
+        string text,
+        string bgHex,
+        string borderHex,
+        string fgHex,
+        Action onClick)
+    {
+        var conv = new BrushConverter();
+        var btn = new System.Windows.Controls.Button
+        {
+            Content = text,
+            Background = (System.Windows.Media.Brush)conv.ConvertFromString(bgHex)!,
+            BorderBrush = (System.Windows.Media.Brush)conv.ConvertFromString(borderHex)!,
+            Foreground = (System.Windows.Media.Brush)conv.ConvertFromString(fgHex)!,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(10, 4, 10, 4),
+            Margin = new Thickness(6, 0, 0, 0),
+            FontSize = 11.5,
+            FontWeight = FontWeights.SemiBold,
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+        btn.Click += (_, _) => onClick();
+        return btn;
+    }
+
+    private static Border BuildDeviceRow(
+        string title,
+        string subtitle,
+        string statusTag,
+        MediaColor statusColor,
+        params System.Windows.Controls.Button[] actions)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var infoStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var topRow = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+        topRow.Children.Add(new System.Windows.Shapes.Ellipse
+        {
+            Width = 7,
+            Height = 7,
+            Fill = new SolidColorBrush(statusColor),
+            Margin = new Thickness(0, 0, 7, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        topRow.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(MediaColor.FromRgb(248, 250, 252))
+        });
+        topRow.Children.Add(new TextBlock
+        {
+            Text = statusTag,
+            FontSize = 10,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(statusColor),
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+
+        infoStack.Children.Add(topRow);
+        infoStack.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 11.5,
+            Foreground = new SolidColorBrush(MediaColor.FromRgb(148, 163, 184)),
+            Margin = new Thickness(14, 2, 0, 0)
+        });
+        Grid.SetColumn(infoStack, 0);
+        grid.Children.Add(infoStack);
+
+        var actStack = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        foreach (var a in actions)
+            actStack.Children.Add(a);
+        Grid.SetColumn(actStack, 1);
+        grid.Children.Add(actStack);
+
+        return new Border
+        {
+            Background = new SolidColorBrush(MediaColor.FromRgb(13, 16, 24)),
+            BorderBrush = new SolidColorBrush(MediaColor.FromRgb(29, 37, 54)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12, 9, 12, 9),
+            Margin = new Thickness(0, 0, 0, 8),
+            Child = grid
+        };
     }
 
     private static async Task FlashButtonTextAsync(System.Windows.Controls.Button btn, string tempText)

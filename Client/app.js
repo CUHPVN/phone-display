@@ -38,8 +38,12 @@
   const audioOnlyBanner = document.getElementById("audio-only-banner");
   const txtAudioOnlyTitle = document.getElementById("txt-audio-only-title");
   const txtAudioOnlySub = document.getElementById("txt-audio-only-sub");
-  const pinBox = document.getElementById("pin-box");
-  const inputPin = document.getElementById("input-pin");
+  const inputDeviceName = document.getElementById("input-device-name");
+  const txtDeviceNameLabel = document.getElementById("txt-device-name-label");
+  const pairStatusBox = document.getElementById("pair-status-box");
+  const pairSpinner = document.getElementById("pair-spinner");
+  const txtPairStatus = document.getElementById("txt-pair-status");
+
   const rawUrlToken = new URLSearchParams(window.location.search).get("token") || "";
   if (rawUrlToken) {
     try { sessionStorage.setItem("pd_token", rawUrlToken); } catch { /* ignore */ }
@@ -47,18 +51,76 @@
   }
   let storedToken = "";
   try { storedToken = sessionStorage.getItem("pd_token") || ""; } catch { /* ignore */ }
-  const urlToken = rawUrlToken || storedToken;
-  if (urlToken) {
-    inputPin.value = urlToken;
-    pinBox.classList.add("hidden");
+  const bootstrapToken = (rawUrlToken || storedToken).trim();
+
+  function randomHex(byteLen) {
+    const bytes = new Uint8Array(byteLen);
+    if (window.crypto && window.crypto.getRandomValues) {
+      window.crypto.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < byteLen; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
+
+  function detectDefaultDeviceName() {
+    const ua = navigator.userAgent || "";
+    let os = "Device";
+    if (/Android/i.test(ua)) os = "Android";
+    else if (/iPhone/i.test(ua)) os = "iPhone";
+    else if (/iPad/i.test(ua)) os = "iPad";
+    else if (/Windows/i.test(ua)) os = "Windows PC";
+    else if (/Mac OS X|Macintosh/i.test(ua)) os = "Mac";
+    else if (/Linux/i.test(ua)) os = "Linux";
+
+    let browser = "Browser";
+    if (/Edg/i.test(ua)) browser = "Edge";
+    else if (/Chrome|CriOS/i.test(ua)) browser = "Chrome";
+    else if (/Firefox/i.test(ua)) browser = "Firefox";
+    else if (/Safari/i.test(ua)) browser = "Safari";
+
+    return `${os} • ${browser}`;
+  }
+
+  function getOrCreateStorage(key, fallbackFn) {
+    try {
+      const existing = localStorage.getItem(key);
+      if (existing && existing.trim()) return existing.trim();
+      const val = fallbackFn();
+      localStorage.setItem(key, val);
+      return val;
+    } catch {
+      return fallbackFn();
+    }
+  }
+
+  const deviceId = getOrCreateStorage("pd_device_id", () => randomHex(16));
+  const deviceSecret = getOrCreateStorage("pd_device_secret", () => randomHex(32));
+  inputDeviceName.value = getOrCreateStorage("pd_device_name", detectDefaultDeviceName);
+
+  function setPairStatus(mode, text) {
+    if (!mode) {
+      pairStatusBox.classList.add("hidden");
+      pairStatusBox.classList.remove("pending", "error");
+      return;
+    }
+    pairStatusBox.classList.remove("hidden", "pending", "error");
+    pairStatusBox.classList.add(mode);
+    pairSpinner.classList.toggle("hidden", mode !== "pending");
+    txtPairStatus.textContent = text;
+  }
+
   let webLang = navigator.language && navigator.language.toLowerCase().startsWith("vi") ? "vi" : "en";
 
   const WEB_STRINGS = {
     vi: {
       subtitle: "Biến điện thoại thành màn hình phụ Windows 11 giải mã phần cứng, không cần cài app.",
-      start: "Bắt đầu màn hình phụ",
-      pinPlaceholder: "Mã PIN (6 số)",
+      start: "Kết nối màn hình phụ",
+      deviceNameLabel: "Tên thiết bị hiển thị trên Host",
+      deviceNamePlaceholder: "Nhập tên thiết bị...",
+      waitingApproval: "Đang chờ máy Host chấp nhận kết nối...",
+      denied: "Host đã từ chối yêu cầu kết nối của thiết bị này",
+      banned: "Thiết bị này đã bị Host chặn (Banned)",
       insecureTitle: "WebCodecs cần HTTPS khi dùng qua Wi-Fi",
       insecureDesc: "Chuyển sang cổng HTTPS hoặc cắm cáp USB ADB (http://localhost:8080).",
       switchHttps: "Chuyển sang HTTPS (:8443)",
@@ -68,8 +130,8 @@
       connecting: "Đang kết nối...",
       connected: "Đã kết nối",
       reconnecting: "Đang kết nối lại...",
-      rejected: "Sai mã PIN — vui lòng kiểm tra và nhập lại",
-      rateLimited: "Nhập sai PIN quá nhiều lần — tạm khóa 5 phút",
+      rejected: "Kết nối bị từ chối bởi Host",
+      rateLimited: "Thử kết nối quá nhiều lần — tạm khóa 5 phút",
       kbdOn: "Bàn phím: BẬT",
       kbdOff: "Bàn phím: TẮT",
       kbdBtnOn: "⌨ Bật",
@@ -93,8 +155,12 @@
     },
     en: {
       subtitle: "Turn your device into a hardware-decoded extended Windows 11 monitor with zero app installation.",
-      start: "Start Extended Display",
-      pinPlaceholder: "PIN (6 digits)",
+      start: "Connect Extended Display",
+      deviceNameLabel: "Device Name shown on Host",
+      deviceNamePlaceholder: "Enter device name...",
+      waitingApproval: "Waiting for Host approval...",
+      denied: "Host denied this connection request",
+      banned: "This device has been banned by Host",
       insecureTitle: "WebCodecs requires HTTPS over Wi-Fi",
       insecureDesc: "Switch to the secure port or connect via USB ADB (http://localhost:8080).",
       switchHttps: "Switch to HTTPS (:8443)",
@@ -104,8 +170,8 @@
       connecting: "Connecting...",
       connected: "Connected",
       reconnecting: "Reconnecting...",
-      rejected: "Invalid PIN — please check and try again",
-      rateLimited: "Too many wrong PIN attempts — locked for 5 min",
+      rejected: "Connection rejected by Host",
+      rateLimited: "Too many failed attempts — locked for 5 min",
       kbdOn: "Keyboard ON",
       kbdOff: "Keyboard OFF",
       kbdBtnOn: "⌨ On",
@@ -136,7 +202,8 @@
   function applyWebLang() {
     txtWebSubtitle.textContent = t("subtitle");
     btnStart.textContent = t("start");
-    inputPin.placeholder = t("pinPlaceholder");
+    if (txtDeviceNameLabel) txtDeviceNameLabel.textContent = t("deviceNameLabel");
+    if (inputDeviceName) inputDeviceName.placeholder = t("deviceNamePlaceholder");
     txtInsecureTitle.textContent = t("insecureTitle");
     txtInsecureDesc.textContent = t("insecureDesc");
     btnSwitchHttps.textContent = t("switchHttps");
@@ -604,6 +671,11 @@
 
   async function onAuthenticated() {
     hasConnectedOnce = true;
+    setPairStatus(null);
+    btnStart.disabled = false;
+    landingOverlay.classList.add("hidden");
+    miniPill.classList.remove("hidden");
+    resizeCanvas();
     showToast(t("connected"), 1200);
     await initDecoder();
 
@@ -635,10 +707,8 @@
     }
 
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const token = (inputPin.value || urlToken || "").trim();
-    if (token) {
-      try { sessionStorage.setItem("pd_token", token); } catch { /* ignore */ }
-    }
+    const devName = (inputDeviceName?.value || "").trim() || detectDefaultDeviceName();
+    try { localStorage.setItem("pd_device_name", devName); } catch { /* ignore */ }
     const wsUrl = `${proto}//${window.location.host}/ws`;
     showToast(t("connecting"), 0);
 
@@ -646,7 +716,13 @@
     ws.binaryType = "arraybuffer";
 
     ws.onopen = () => {
-      sendControl({ type: "auth", token });
+      sendControl({
+        type: "pair",
+        deviceId,
+        deviceSecret,
+        deviceName: devName,
+        token: bootstrapToken || undefined
+      });
     };
 
     ws.onmessage = (ev) => {
@@ -675,18 +751,19 @@
       }
       if (!isRunning) return;
 
-      if (ev.code === 4001 || ev.code === 4029) {
+      if (ev.code === 4001 || ev.code === 4003 || ev.code === 4029) {
         isRunning = false;
-        if (ev.code === 4001) {
-          try { sessionStorage.removeItem("pd_token"); } catch { }
-          inputPin.value = "";
-          pinBox.classList.remove("hidden");
-        }
+        btnStart.disabled = false;
         miniPill.classList.add("hidden");
         statsHud.classList.add("hidden");
         audioOnlyBanner?.classList.add("hidden");
         landingOverlay.classList.remove("hidden");
-        showToast(t(ev.code === 4029 ? "rateLimited" : "rejected"), 4000);
+        if (document.fullscreenElement) {
+          try { document.exitFullscreen().catch(() => { }); } catch { }
+        }
+        const msgKey = ev.code === 4029 ? "rateLimited" : ev.code === 4003 ? "banned" : "denied";
+        setPairStatus("error", t(msgKey));
+        showToast(t(msgKey), 4000);
         return;
       }
 
@@ -706,6 +783,21 @@
   function handleServerText(text) {
     let msg;
     try { msg = JSON.parse(text); } catch { return; }
+
+    if (msg.type === "pair_status") {
+      if (msg.status === "pending") {
+        setPairStatus("pending", t("waitingApproval"));
+      } else if (msg.status === "denied") {
+        isRunning = false;
+        btnStart.disabled = false;
+        setPairStatus("error", t("denied"));
+      } else if (msg.status === "banned") {
+        isRunning = false;
+        btnStart.disabled = false;
+        setPairStatus("error", t("banned"));
+      }
+      return;
+    }
 
     if (msg.type === "auth_ok") {
       onAuthenticated();
@@ -1333,14 +1425,14 @@
 
   window.addEventListener("keydown", (e) => {
     if (!isRunning || !hostAllowInput || inputMode === "view") return;
-    if (document.activeElement === mobileKbdInput || document.activeElement === inputPin) return;
+    if (document.activeElement === mobileKbdInput || document.activeElement === inputDeviceName) return;
     e.preventDefault();
     sendControl({ type: "input", action: "keydown", key: e.key, code: e.code });
   });
 
   window.addEventListener("keyup", (e) => {
     if (!isRunning || !hostAllowInput || inputMode === "view") return;
-    if (document.activeElement === mobileKbdInput || document.activeElement === inputPin) return;
+    if (document.activeElement === mobileKbdInput || document.activeElement === inputDeviceName) return;
     e.preventDefault();
     sendControl({ type: "input", action: "keyup", key: e.key, code: e.code });
   });
@@ -1424,15 +1516,16 @@
     miniPill.classList.add("hidden");
     statsHud.classList.add("hidden");
     audioOnlyBanner?.classList.add("hidden");
+    setPairStatus(null);
+    btnStart.disabled = false;
     landingOverlay.classList.remove("hidden");
   });
 
   btnStart.addEventListener("click", async () => {
     isRunning = true;
+    btnStart.disabled = true;
+    setPairStatus("pending", t("connecting"));
     initAudioContext();
-    landingOverlay.classList.add("hidden");
-    miniPill.classList.remove("hidden");
-    resizeCanvas();
     await acquireImmersiveMode();
     connectWebSocket();
   });

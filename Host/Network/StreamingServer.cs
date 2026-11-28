@@ -17,14 +17,28 @@ using PhoneDisplay.Host.Models;
 
 namespace PhoneDisplay.Host.Network;
 
+public sealed record ConnectedDeviceInfo(
+    Guid SessionId,
+    string DeviceId,
+    string DeviceName,
+    string IpAddress,
+    DateTime ConnectedAtUtc,
+    bool AudioEnabled);
+
+public sealed record PendingDeviceInfo(
+    string DeviceId,
+    string DeviceName,
+    string IpAddress,
+    DateTime RequestedAtUtc);
+
 public sealed class StreamingServer : IAsyncDisposable
 {
-    private readonly WebApplication _app;
-    private readonly ConcurrentDictionary<Guid, ClientSession> _clients = new();
-    private readonly ConcurrentDictionary<string, AuthAttemptState> _authAttempts = new();
-    private readonly InputInjector _inputInjector;
-    private readonly string _accessToken;
-    private volatile bool _isStopping;
+    private enum PendingResolution
+    {
+        Approve,
+        Deny,
+        Ban
+    }
 
     private sealed class AuthAttemptState
     {
@@ -33,22 +47,49 @@ public sealed class StreamingServer : IAsyncDisposable
         public DateTime LockedUntilUtc;
     }
 
+    private sealed class PendingSession
+    {
+        public PendingDeviceInfo Info { get; }
+        public WebSocket Socket { get; }
+        public TaskCompletionSource<PendingResolution> Decision { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public PendingSession(PendingDeviceInfo info, WebSocket socket)
+        {
+            Info = info;
+            Socket = socket;
+        }
+    }
+
+    private readonly WebApplication _app;
+    private readonly ConcurrentDictionary<Guid, ClientSession> _clients = new();
+    private readonly ConcurrentDictionary<string, PendingSession> _pending = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, AuthAttemptState> _authAttempts = new();
+    private readonly InputInjector _inputInjector;
+    private readonly DeviceRegistry _deviceRegistry;
+    private readonly string? _bootstrapToken;
+    private volatile bool _isStopping;
+
     public int ConnectedClientCount => _clients.Count;
     public volatile bool AllowRemoteInput = true;
 
     public event Action<int, int, int>? OnClientHello;
     public event Action<int?, int?>? OnRuntimeConfigRequested;
     public event Action? OnKeyframeRequested;
+    public event Action? OnDevicesChanged;
+    public event Action<PendingDeviceInfo>? OnPendingRequestArrived;
 
     public StreamingServer(
         AppConfig config,
         string clientRootPath,
         X509Certificate2 lanCert,
         InputInjector inputInjector,
-        string accessToken)
+        DeviceRegistry deviceRegistry,
+        string? bootstrapToken = null)
     {
         _inputInjector = inputInjector;
-        _accessToken = accessToken;
+        _deviceRegistry = deviceRegistry;
+        _bootstrapToken = string.IsNullOrWhiteSpace(bootstrapToken) ? null : bootstrapToken.Trim();
 
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
@@ -99,6 +140,89 @@ public sealed class StreamingServer : IAsyncDisposable
 
     public Task StartAsync(CancellationToken ct = default) => _app.StartAsync(ct);
 
+    public IReadOnlyList<ConnectedDeviceInfo> GetConnectedDevices() =>
+        _clients.Values
+            .Select(c => new ConnectedDeviceInfo(c.Id, c.DeviceId, c.DeviceName, c.IpAddress, c.ConnectedAtUtc, c.AudioEnabled))
+            .OrderByDescending(c => c.ConnectedAtUtc)
+            .ToList();
+
+    public IReadOnlyList<PendingDeviceInfo> GetPendingRequests() =>
+        _pending.Values
+            .Select(p => p.Info)
+            .OrderByDescending(p => p.RequestedAtUtc)
+            .ToList();
+
+    public void ApprovePending(string deviceId)
+    {
+        _deviceRegistry.Approve(deviceId);
+        if (_pending.TryRemove(deviceId, out var pending))
+            pending.Decision.TrySetResult(PendingResolution.Approve);
+        OnDevicesChanged?.Invoke();
+    }
+
+    public void DenyPending(string deviceId)
+    {
+        if (_pending.TryRemove(deviceId, out var pending))
+            pending.Decision.TrySetResult(PendingResolution.Deny);
+        OnDevicesChanged?.Invoke();
+    }
+
+    public void KickDevice(string deviceId)
+    {
+        foreach (var kvp in _clients)
+        {
+            if (string.Equals(kvp.Value.DeviceId, deviceId, StringComparison.Ordinal) &&
+                _clients.TryRemove(kvp.Key, out var removed))
+            {
+                removed.Complete();
+                removed.AbortSocket();
+            }
+        }
+        OnDevicesChanged?.Invoke();
+    }
+
+    public void RevokeDevice(string deviceId)
+    {
+        _deviceRegistry.Revoke(deviceId);
+        KickDevice(deviceId);
+        if (_pending.TryRemove(deviceId, out var pending))
+            pending.Decision.TrySetResult(PendingResolution.Deny);
+        OnDevicesChanged?.Invoke();
+    }
+
+    public void BanDevice(string deviceId)
+    {
+        _deviceRegistry.Ban(deviceId);
+        foreach (var kvp in _clients)
+        {
+            if (string.Equals(kvp.Value.DeviceId, deviceId, StringComparison.Ordinal) &&
+                _clients.TryRemove(kvp.Key, out var removed))
+            {
+                removed.EnqueueText("{\"type\":\"pair_status\",\"status\":\"banned\"}");
+                removed.Complete();
+                removed.AbortSocket();
+            }
+        }
+        if (_pending.TryRemove(deviceId, out var pending))
+            pending.Decision.TrySetResult(PendingResolution.Ban);
+        OnDevicesChanged?.Invoke();
+    }
+
+    public void UnbanDevice(string deviceId)
+    {
+        _deviceRegistry.Unban(deviceId);
+        OnDevicesChanged?.Invoke();
+    }
+
+    public void RemoveDevice(string deviceId)
+    {
+        KickDevice(deviceId);
+        if (_pending.TryRemove(deviceId, out var pending))
+            pending.Decision.TrySetResult(PendingResolution.Deny);
+        _deviceRegistry.Remove(deviceId);
+        OnDevicesChanged?.Invoke();
+    }
+
     private async Task HandleWebSocketAsync(HttpContext context)
     {
         if (!context.WebSockets.IsWebSocketRequest)
@@ -126,55 +250,131 @@ public sealed class StreamingServer : IAsyncDisposable
             return;
         }
 
-        string? queryToken = context.Request.Query["token"];
-        if (!string.IsNullOrEmpty(queryToken))
-        {
-            if (!string.IsNullOrEmpty(_accessToken) && !ConstantTimeEquals(queryToken, _accessToken))
-            {
-                RecordAuthFailure(remoteIp);
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return;
-            }
-            ClearAuthFailures(remoteIp);
-        }
-
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
 
-        if (string.IsNullOrEmpty(queryToken) && !string.IsNullOrEmpty(_accessToken))
+        using var handshakeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        ClientMessage? handshake = await ReceiveHandshakeAsync(ws, handshakeCts.Token);
+        if (handshake is null)
         {
-            using var authCts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
-            string? authToken = await ReceiveAuthTokenAsync(ws, authCts.Token);
-            if (authToken is null || !ConstantTimeEquals(authToken, _accessToken))
+            await CloseSafeAsync(ws, 4001, "Missing handshake");
+            return;
+        }
+
+        string deviceId;
+        string deviceSecret;
+        string deviceName;
+        string? suppliedToken = handshake.Token;
+
+        if (string.Equals(handshake.Type, "pair", StringComparison.Ordinal))
+        {
+            deviceId = handshake.DeviceId?.Trim() ?? string.Empty;
+            deviceSecret = handshake.DeviceSecret?.Trim() ?? string.Empty;
+            deviceName = string.IsNullOrWhiteSpace(handshake.DeviceName)
+                ? $"Device ({remoteIp})"
+                : handshake.DeviceName.Trim();
+        }
+        else if (string.Equals(handshake.Type, "auth", StringComparison.Ordinal))
+        {
+            deviceId = $"legacy-{remoteIp}";
+            deviceSecret = suppliedToken ?? string.Empty;
+            deviceName = $"Browser ({remoteIp})";
+        }
+        else
+        {
+            await CloseSafeAsync(ws, 4001, "Invalid handshake");
+            return;
+        }
+
+        bool bootstrapOk = !string.IsNullOrEmpty(_bootstrapToken) &&
+                           !string.IsNullOrEmpty(suppliedToken) &&
+                           ConstantTimeEquals(suppliedToken, _bootstrapToken);
+
+        var decision = _deviceRegistry.EvaluateOrRegister(deviceId, deviceSecret, deviceName, remoteIp, bootstrapOk);
+
+        if (decision == DeviceAuthDecision.InvalidSecret)
+        {
+            bool locked = RecordAuthFailure(remoteIp);
+            await SendTextSafeAsync(ws, "{\"type\":\"pair_status\",\"status\":\"banned\"}");
+            await CloseSafeAsync(ws, locked ? 4029 : 4003, locked ? "Rate limited" : "Invalid device credentials");
+            return;
+        }
+
+        if (decision == DeviceAuthDecision.Banned)
+        {
+            await SendTextSafeAsync(ws, "{\"type\":\"pair_status\",\"status\":\"banned\"}");
+            await CloseSafeAsync(ws, 4003, "Device banned");
+            return;
+        }
+
+        ClearAuthFailures(remoteIp);
+
+        if (decision == DeviceAuthDecision.Pending)
+        {
+            if (_pending.Count >= 12 && !_pending.ContainsKey(deviceId))
             {
-                bool nowLocked = RecordAuthFailure(remoteIp);
-                try
-                {
-                    await ws.CloseAsync(
-                        (WebSocketCloseStatus)(nowLocked ? 4029 : 4001),
-                        nowLocked ? "Rate limited" : "Unauthorized",
-                        CancellationToken.None);
-                }
-                catch { }
+                await SendTextSafeAsync(ws, "{\"type\":\"pair_status\",\"status\":\"denied\"}");
+                await CloseSafeAsync(ws, 4029, "Too many pending requests");
                 return;
             }
 
-            ClearAuthFailures(remoteIp);
-            byte[] okBytes = System.Text.Encoding.UTF8.GetBytes("{\"type\":\"auth_ok\"}");
-            await ws.SendAsync(okBytes, WebSocketMessageType.Text, endOfMessage: true, CancellationToken.None);
+            await SendTextSafeAsync(ws, "{\"type\":\"pair_status\",\"status\":\"pending\"}");
+
+            var info = new PendingDeviceInfo(deviceId, deviceName, remoteIp, DateTime.UtcNow);
+            var pendingSession = new PendingSession(info, ws);
+
+            if (_pending.TryGetValue(deviceId, out var oldPending))
+                oldPending.Decision.TrySetResult(PendingResolution.Deny);
+
+            _pending[deviceId] = pendingSession;
+            OnPendingRequestArrived?.Invoke(info);
+            OnDevicesChanged?.Invoke();
+
+            using var disconnectCts = new CancellationTokenSource();
+            var monitorTask = MonitorPendingDisconnectAsync(ws, disconnectCts.Token);
+            var completed = await Task.WhenAny(pendingSession.Decision.Task, monitorTask);
+            disconnectCts.Cancel();
+
+            if (_pending.TryGetValue(deviceId, out var currentPending) && ReferenceEquals(currentPending, pendingSession))
+            {
+                _pending.TryRemove(deviceId, out _);
+                OnDevicesChanged?.Invoke();
+            }
+
+            if (completed != pendingSession.Decision.Task)
+                return;
+
+            PendingResolution resolution = await pendingSession.Decision.Task;
+            if (resolution == PendingResolution.Ban)
+            {
+                await SendTextSafeAsync(ws, "{\"type\":\"pair_status\",\"status\":\"banned\"}");
+                await CloseSafeAsync(ws, 4003, "Device banned");
+                return;
+            }
+            if (resolution != PendingResolution.Approve)
+            {
+                await SendTextSafeAsync(ws, "{\"type\":\"pair_status\",\"status\":\"denied\"}");
+                await CloseSafeAsync(ws, 4001, "Connection denied");
+                return;
+            }
         }
 
-        // Replace any previous session only AFTER valid PIN authentication
+        if (!await SendTextSafeAsync(ws, "{\"type\":\"auth_ok\"}"))
+            return;
+
+        // Multi-device: only replace stale session of this SAME deviceId; keep all other approved devices connected
         foreach (var existing in _clients.Values)
         {
-            existing.Complete();
-            existing.AbortSocket();
+            if (string.Equals(existing.DeviceId, deviceId, StringComparison.Ordinal) &&
+                _clients.TryRemove(existing.Id, out var removed))
+            {
+                removed.Complete();
+                removed.AbortSocket();
+            }
         }
-        _clients.Clear();
 
-        var session = new ClientSession(Guid.NewGuid(), ws);
+        var session = new ClientSession(Guid.NewGuid(), ws, deviceId, deviceName, remoteIp);
         _clients[session.Id] = session;
-
-        // Immediately trigger a keyframe so the newly connected WebCodecs decoder starts fast
+        OnDevicesChanged?.Invoke();
         OnKeyframeRequested?.Invoke();
 
         var sendTask = Task.Run(() => session.RunSendLoopAsync());
@@ -186,9 +386,53 @@ public sealed class StreamingServer : IAsyncDisposable
         finally
         {
             _clients.TryRemove(session.Id, out _);
+            OnDevicesChanged?.Invoke();
             session.Complete();
             try { await sendTask; } catch { }
             session.Dispose();
+        }
+    }
+
+    private static async Task<bool> SendTextSafeAsync(WebSocket ws, string json)
+    {
+        try
+        {
+            if (ws.State != WebSocketState.Open) return false;
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            await ws.SendAsync(bytes, WebSocketMessageType.Text, endOfMessage: true, CancellationToken.None);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task CloseSafeAsync(WebSocket ws, int closeCode, string reason)
+    {
+        try
+        {
+            if (ws.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                await ws.CloseAsync((WebSocketCloseStatus)closeCode, reason, CancellationToken.None);
+        }
+        catch { }
+    }
+
+    private static async Task MonitorPendingDisconnectAsync(WebSocket ws, CancellationToken ct)
+    {
+        byte[] buf = new byte[512];
+        try
+        {
+            while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
+            {
+                var res = await ws.ReceiveAsync(buf, ct);
+                if (res.MessageType == WebSocketMessageType.Close)
+                    return;
+            }
+        }
+        catch
+        {
+            // Disconnected or canceled
         }
     }
 
@@ -243,7 +487,7 @@ public sealed class StreamingServer : IAsyncDisposable
         return CryptographicOperations.FixedTimeEquals(ba, bb);
     }
 
-    private static async Task<string?> ReceiveAuthTokenAsync(WebSocket ws, CancellationToken ct)
+    private static async Task<ClientMessage?> ReceiveHandshakeAsync(WebSocket ws, CancellationToken ct)
     {
         byte[] buf = new byte[4096];
         using var ms = new MemoryStream();
@@ -262,8 +506,7 @@ public sealed class StreamingServer : IAsyncDisposable
             }
 
             string json = System.Text.Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
-            var msg = JsonSerializer.Deserialize<ClientMessage>(json);
-            return msg is { Type: "auth" } ? msg.Token : null;
+            return JsonSerializer.Deserialize<ClientMessage>(json);
         }
         catch
         {
@@ -323,7 +566,10 @@ public sealed class StreamingServer : IAsyncDisposable
 
                 case "config":
                     if (msg.AudioEnabled.HasValue)
+                    {
                         session.AudioEnabled = msg.AudioEnabled.Value;
+                        OnDevicesChanged?.Invoke();
+                    }
                     if (msg.Fps.HasValue || msg.BitrateKbps.HasValue)
                         OnRuntimeConfigRequested?.Invoke(msg.Fps, msg.BitrateKbps);
                     break;
@@ -400,6 +646,12 @@ public sealed class StreamingServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _isStopping = true;
+        foreach (var kvp in _pending)
+        {
+            kvp.Value.Decision.TrySetResult(PendingResolution.Deny);
+        }
+        _pending.Clear();
+
         foreach (var kvp in _clients)
         {
             kvp.Value.Complete();
@@ -416,6 +668,10 @@ public sealed class StreamingServer : IAsyncDisposable
     {
         public Guid Id { get; }
         public WebSocket Socket { get; }
+        public string DeviceId { get; }
+        public string DeviceName { get; }
+        public string IpAddress { get; }
+        public DateTime ConnectedAtUtc { get; } = DateTime.UtcNow;
         public volatile bool AudioEnabled = true;
 
         private readonly Channel<byte[]> _controlChannel;
@@ -426,10 +682,13 @@ public sealed class StreamingServer : IAsyncDisposable
         private volatile bool _waitingForKeyframe = true;
         private int _signalPending;
 
-        public ClientSession(Guid id, WebSocket socket)
+        public ClientSession(Guid id, WebSocket socket, string deviceId, string deviceName, string ipAddress)
         {
             Id = id;
             Socket = socket;
+            DeviceId = deviceId;
+            DeviceName = deviceName;
+            IpAddress = ipAddress;
 
             _controlChannel = Channel.CreateBounded<byte[]>(
                 new BoundedChannelOptions(32)

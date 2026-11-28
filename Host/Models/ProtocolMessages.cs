@@ -32,6 +32,15 @@ public sealed class ClientMessage
     [JsonPropertyName("token")]
     public string? Token { get; set; }
 
+    [JsonPropertyName("deviceId")]
+    public string? DeviceId { get; set; }
+
+    [JsonPropertyName("deviceSecret")]
+    public string? DeviceSecret { get; set; }
+
+    [JsonPropertyName("deviceName")]
+    public string? DeviceName { get; set; }
+
     [JsonPropertyName("ts")]
     public long TimestampMs { get; set; }
 

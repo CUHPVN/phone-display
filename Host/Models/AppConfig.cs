@@ -80,6 +80,7 @@ public sealed class AppConfig
                     break;
                 case "--pin":
                 case "--token":
+                case "--bootstrap-token":
                     string? pin = Next();
                     if (!string.IsNullOrWhiteSpace(pin)) config.CustomPin = pin.Trim();
                     break;
@@ -124,7 +125,7 @@ public sealed class AppConfig
               -e, --encoder <mode>      auto | nvenc | x264 (default: auto)
                   --no-auto-res         Disable auto-matching secondary monitor resolution
                   --ffmpeg <path>       Path to ffmpeg.exe (default: ffmpeg in PATH)
-                  --pin <pin>           Set custom session PIN / token
+                  --pin <token>         Optional one-time bootstrap token to auto-approve a device into devices.json
                   --autostart           Automatically start streaming on launch
                   --no-video            Disable screen video capture (audio-only mode)
                   --no-audio            Disable WASAPI loopback system audio capture

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>PhoneDisplay — Extended Monitor</title>
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
   <div id="app">
@@ -30,9 +30,14 @@
           <button id="btn-switch-https" class="btn-secondary">Switch to HTTPS (:8443)</button>
         </div>
 
-        <div id="pin-box" style="margin-bottom:14px;">
-          <input id="input-pin" type="text" inputmode="numeric" maxlength="6" placeholder="PIN (6 digits)"
-                 style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.16);background:rgba(15,23,42,0.85);color:#f8fafc;font-size:15px;text-align:center;letter-spacing:0.2em;outline:none;" />
+        <div id="device-name-box" style="margin-bottom:14px;">
+          <label id="txt-device-name-label" for="input-device-name" style="display:block;font-size:11px;color:#94a3b8;margin-bottom:6px;text-align:left;">Device Name</label>
+          <input id="input-device-name" type="text" maxlength="40" placeholder="My Device" class="device-name-input" />
+        </div>
+
+        <div id="pair-status-box" class="pair-status hidden">
+          <span id="pair-spinner" class="pair-spinner"></span>
+          <span id="txt-pair-status">Waiting for host approval...</span>
         </div>
 
         <button id="btn-start" class="btn-primary">
@@ -88,6 +93,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>
